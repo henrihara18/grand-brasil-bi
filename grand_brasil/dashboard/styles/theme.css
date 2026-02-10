@@ -1,0 +1,76 @@
+/* Grand Brasil - Custom Streamlit Theme */
+
+/* Main background */
+.stApp {
+    background-color: #f8f9fa;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #1a1a2e;
+    color: #ffffff;
+}
+
+[data-testid="stSidebar"] .stMarkdown {
+    color: #e0e0e0;
+}
+
+[data-testid="stSidebar"] h1 {
+    color: #ffffff;
+    font-size: 1.5rem;
+}
+
+/* Metric cards */
+[data-testid="stMetricValue"] {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Headers */
+h1 {
+    color: #1a1a2e;
+    border-bottom: 3px solid #e74c3c;
+    padding-bottom: 0.5rem;
+}
+
+h2, h3 {
+    color: #2c3e50;
+}
+
+/* Dataframe styling */
+.stDataFrame {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Download button */
+.stDownloadButton > button {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+}
+
+.stDownloadButton > button:hover {
+    background-color: #219a52;
+}
+
+/* Dividers */
+hr {
+    border-color: #dee2e6;
+    margin: 1.5rem 0;
+}
+
+/* Info/Warning/Success/Error boxes */
+.stAlert {
+    border-radius: 8px;
+}

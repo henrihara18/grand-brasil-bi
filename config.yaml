@@ -1,0 +1,26 @@
+# Grand Brasil - BI Estoque
+# Configuracoes de regras de negocio
+# Edite este arquivo para ajustar os parametros de analise
+
+aging:
+  green_max_days: 30
+  yellow_max_days: 60
+  orange_max_days: 90
+
+price_reduction_rules:
+  - days_threshold: 45
+    reduction_percent: 5.0
+    min_margin_percent: 3.0
+  - days_threshold: 60
+    reduction_percent: 10.0
+    min_margin_percent: 2.0
+  - days_threshold: 90
+    reduction_percent: 15.0
+    min_margin_percent: 1.0
+
+b2b_scoring:
+  aging_weight: 0.4
+  concentration_weight: 0.4
+  margin_weight: 0.2
+  score_threshold: 7.0
+  concentration_limit: 3
