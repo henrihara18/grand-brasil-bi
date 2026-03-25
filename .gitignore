@@ -27,6 +27,7 @@ data/uploads/*
 data/fipe_cache/*
 !data/uploads/.gitkeep
 !data/fipe_cache/.gitkeep
+.cache/
 
 # OS
 .DS_Store

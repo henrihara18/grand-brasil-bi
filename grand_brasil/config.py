@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -35,12 +35,26 @@ class B2BScoringWeights(BaseModel):
     concentration_limit: int = 3          # Same model count to trigger flag
 
 
+class AppraisalConfig(BaseModel):
+    """Configuration for the trade-in appraisal engine."""
+
+    year_tolerance: int = 2               # +/- years for comparable search
+    loja_target_margin: float = 15.0      # Target gross margin % for Loja (B2C)
+    revenda_target_margin: float = 5.5    # Target gross margin % for Revenda (B2B)
+    min_comparables: int = 3              # Minimum comparables for "media" confidence
+    sales_history_file: str = "Relatorio vendas 20255 processado.xlsx"
+    km_pct_per_10k: float = 1.0           # % price change per 10k km difference
+    recency_halflife_days: float = 180.0  # Half-life for recency weighting (days)
+    year_pct_per_year: float = 10.0       # % price adjustment per year difference
+
+
 class AppConfig(BaseModel):
     """All business rule configuration loaded from config.yaml."""
 
     aging: AgingThresholds = AgingThresholds()
     price_reduction_rules: list[PriceReductionRule] = []
     b2b_scoring: B2BScoringWeights = B2BScoringWeights()
+    appraisal: AppraisalConfig = AppraisalConfig()
 
 
 class Settings(BaseSettings):

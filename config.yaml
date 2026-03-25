@@ -24,3 +24,24 @@ b2b_scoring:
   margin_weight: 0.2
   score_threshold: 7.0
   concentration_limit: 3
+
+# Avaliacao de troca (trade-in appraisal)
+appraisal:
+  year_tolerance: 2              # +/- anos para buscar comparaveis
+  loja_target_margin: 15.0       # Margem bruta alvo para Loja (B2C) %
+  revenda_target_margin: 5.5     # Margem bruta alvo para Revenda (B2B) %
+  min_comparables: 3             # Minimo de comparaveis para confianca "media"
+  sales_history_file: "Relatorio vendas 20255 processado.xlsx"
+  # Ajuste por KM: variacao percentual no preco estimado a cada 10.000 km de diferenca
+  km_pct_per_10k: 1.0
+  # Ponderacao por recencia: meia-vida em dias (vendas mais antigas pesam menos)
+  recency_halflife_days: 180
+  # Ajuste por ano modelo: % de ajuste no preco do comparavel por ano de diferenca
+  # Ex: comparavel 2023 avaliando um 2024 -> preco ajustado x 1.10
+  year_pct_per_year: 10.0
+  # Filtro de blindados: premio maximo acima da ancora (mediana do quartil inferior 75%)
+  # Carros 2019 ou mais antigos: sem filtragem
+  blindado_premiums:
+    "2024-2025": 45000            # Faixa real: 40k-50k
+    "2022-2023": 35000            # Faixa real: 30k-40k
+    "2020-2021": 22500            # Faixa real: 15k-30k

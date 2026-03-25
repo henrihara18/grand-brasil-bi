@@ -8,11 +8,19 @@ from grand_brasil.models.analysis import (
     InventorySummary,
     PriceRecommendation,
 )
+from grand_brasil.models.appraisal import (
+    AppraisalRequest,
+    AppraisalSuggestion,
+    Comparable,
+)
 
 __all__ = [
     "AgingBracket",
     "AgingResult",
+    "AppraisalRequest",
+    "AppraisalSuggestion",
     "B2BCandidate",
+    "Comparable",
     "FuelType",
     "InventorySummary",
     "PriceRecommendation",

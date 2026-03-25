@@ -17,6 +17,9 @@ plotly>=5.18,<6.0
 pyyaml>=6.0,<7.0
 python-dotenv>=1.0,<2.0
 
+# Google Drive download (historico de vendas em cloud)
+requests>=2.31,<3.0
+
 # Testing
 pytest>=7.4,<9.0
 pytest-cov>=4.1,<6.0

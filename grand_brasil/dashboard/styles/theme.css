@@ -11,13 +11,31 @@
     color: #ffffff;
 }
 
-[data-testid="stSidebar"] .stMarkdown {
-    color: #e0e0e0;
+[data-testid="stSidebar"] * {
+    color: #ffffff !important;
+}
+
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] .stMarkdown p,
+[data-testid="stSidebar"] .stMarkdown span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stRadio label,
+[data-testid="stSidebar"] .stFileUploader label,
+[data-testid="stSidebar"] .stFileUploader span,
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: #ffffff !important;
 }
 
 [data-testid="stSidebar"] h1 {
-    color: #ffffff;
+    color: #ffffff !important;
     font-size: 1.5rem;
+}
+
+[data-testid="stSidebar"] .stSuccess p,
+[data-testid="stSidebar"] .stError p,
+[data-testid="stSidebar"] .stAlert p {
+    color: inherit !important;
 }
 
 /* Metric cards */
