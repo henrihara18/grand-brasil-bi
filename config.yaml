@@ -31,17 +31,166 @@ appraisal:
   loja_target_margin: 15.0       # Margem bruta alvo para Loja (B2C) %
   revenda_target_margin: 5.5     # Margem bruta alvo para Revenda (B2B) %
   min_comparables: 3             # Minimo de comparaveis para confianca "media"
-  sales_history_file: "Relatorio vendas 20255 processado.xlsx"
-  # Ajuste por KM: variacao percentual no preco estimado a cada 10.000 km de diferenca
-  km_pct_per_10k: 1.0
+  sales_history_file: "Vendas 2025-2026 processado.xlsx"
+  # Base de avaliacoes: planilha Google (APPRAISAL_HISTORY_URL) cobre 2026+;
+  # o Excel legado complementa com as linhas anteriores a appraisal_legacy_until.
+  appraisal_legacy_file: "Avaliações 2025 e 2026.xlsx"
+  appraisal_legacy_until: "2026-01-01"
   # Ponderacao por recencia: meia-vida em dias (vendas mais antigas pesam menos)
   recency_halflife_days: 180
   # Ajuste por ano modelo: % de ajuste no preco do comparavel por ano de diferenca
-  # Ex: comparavel 2023 avaliando um 2024 -> preco ajustado x 1.10
-  year_pct_per_year: 10.0
-  # Filtro de blindados: premio maximo acima da ancora (mediana do quartil inferior 75%)
-  # Carros 2019 ou mais antigos: sem filtragem
-  blindado_premiums:
-    "2024-2025": 45000            # Faixa real: 40k-50k
-    "2022-2023": 35000            # Faixa real: 30k-40k
-    "2020-2021": 22500            # Faixa real: 15k-30k
+  # Ex: comparavel 2023 avaliando um 2024 -> preco ajustado x 1.075
+  # Calibrado a partir de 3k vendas reais: mediana ~7.4%/ano (era 10%)
+  year_pct_per_year: 7.5
+  # Filtro de blindados nos comparaveis (cerca de preco por faixa de ano):
+  # thresholds em analysis/_blindado.py (_blindado_filter_premium); 2019 ou mais antigo nao filtra.
+
+  # ── Ancora primaria: buy-ratio (base historica de avaliacoes) ─────────────
+  buy_ratio:
+    # Pesos por status para mediana ponderada:
+    # UTILIZADO/REPASSE = negocios fechados; AVALIADO = oferta que nao fechou.
+    utilizado_weight: 1.0
+    repasse_weight: 1.0
+    # Calibrado a partir de analise de 3k avaliacoes: ratio UTILIZADO sistematicamente
+    # ~2.4pp acima de AVALIADO — reduzimos o peso de 0.4 para 0.25 para reduzir vies.
+    avaliado_weight: 0.25
+    # Janelas de KM por tier de matching (±N km)
+    km_window_tight: 6000         # Tier 1: mesmo ano, KM +-6k (12k total)
+    km_window_wide: 12000         # Tier 2: mesmo ano, KM +-12k
+    km_window_widest: 24000       # Tier 5: ano +-2, KM +-24k
+    min_tier_sample: 5            # Minimo de comps para consolidar um tier
+    min_fallback_sample: 3        # Minimo absoluto para qualquer estimativa
+    # ── Refinamentos adotados na revisao de out/2026 (ver REVISAO_PRECIFICACAO.md, Fase 4) ──
+    # Cada item foi medido isoladamente no backtest temporal contra a regua
+    # (MAPE 7,9% / ±5% 47% / ±10% 73%). Para reproduzir o comportamento antigo:
+    # tier_order: year_first, km_adjust: false, shrink_k: 0.
+    tier_order: km_first          # prefere ano vizinho com KM casado a mesmo ano sem KM
+    km_adjust: true               # ajusta o ratio de cada comparavel para a KM do carro avaliado
+    shrink_k: 3                   # encolhe a mediana local para a referencia do ano: peso n/(n+3)
+    year_profile_by_brand: false  # testado, sem ganho mensuravel
+    recency_halflife_days: null   # testado (180 e 365 d), sem ganho
+    year_adjust_scale: 1.0        # testado 0 e 0,5, sem ganho
+
+  # ── Destaque na tela: mistura das duas ancoras (adotado na revisao de out/2026) ──
+  # 70% historico de compra + 30% analise de vendas. Backtest: MAPE 7,2% -> 6,7%,
+  # ±10% 76% -> 80%. "buy_ratio_first" reproduz o comportamento antigo.
+  headline_mode: ensemble
+  ensemble_weight_buy_ratio: 0.7
+  margin_basis: markup          # "sale" (margem sobre a venda, com imposto) testado: mais conservador sem ganhar
+  sales_tax_pct: 0.0
+  confidence_calibration_file: "data/confidence_calibration.json"
+
+  # ── Fallback de spread FIPE quando nao ha historico suficiente ────────────
+  # Sem historico, o spread calculado seria ruidoso. A regra de fallback
+  # usa uma razao fixa FIPE x ratio para estimar o preco de venda futuro.
+  fipe_spread:
+    min_sample_for_spread: 3          # abaixo disso, usa fallback
+    comparable_year_fipe: true        # FIPE do ano do proprio comparavel (corrige bug B1; neutro no backtest)
+    aggregation: mean                 # "median" testado, sem ganho
+    revenda_fallback_ratio: 0.80      # FIPE x 0.80 (desconto B2B tipico)
+    # loja_fallback_ratio: null       # Loja mantem FIPE raw como base (sem fallback)
+
+  # ── Margem dinamica por faixa de preco + ajustes por velocidade/volatilidade ──
+  # Substitui loja_target_margin (15%) e revenda_target_margin (5.5%) fixos
+  # quando enabled=true. As margens foram calibradas a partir das vendas reais.
+  dynamic_margin:
+    enabled: true
+    min_model_sample: 10            # min. vendas historicas para aplicar ajustes por modelo
+    max_total_adjustment_pp: 5      # cap nos ajustes somados (velocidade + volatilidade)
+
+    # Margem-alvo BASE por faixa de preco — LOJA (B2C)
+    # Avaliadas na ordem; primeira faixa em que sale_price <= max_price vence.
+    loja_bands:
+      - {max_price:    60000, margin_pct: 20.0}   # populares (mediana real ~21.5%)
+      - {max_price:    90000, margin_pct: 14.0}
+      - {max_price:   120000, margin_pct: 12.0}
+      - {max_price:   160000, margin_pct: 11.0}
+      - {max_price:   220000, margin_pct: 10.0}
+      - {max_price: 10000000, margin_pct: 10.0}   # premium
+
+    # Margem-alvo BASE por faixa de preco — REVENDA (B2B)
+    revenda_bands:
+      - {max_price:    60000, margin_pct: 6.0}
+      - {max_price:    90000, margin_pct: 3.5}
+      - {max_price: 10000000, margin_pct: 3.0}
+
+    # Ajuste por velocidade (mediana de dias em estoque do modelo)
+    # Maior threshold vence (avaliado em ordem decrescente).
+    speed_adjustments:
+      - {threshold: 60, adjustment_pp: 4.0}    # >60d: modelo lento
+      - {threshold: 45, adjustment_pp: 2.0}    # 46-60d
+      - {threshold: 30, adjustment_pp: 1.0}    # 31-45d
+
+    # Ajuste por volatilidade (std da margem real historica do modelo)
+    volatility_adjustments:
+      - {threshold: 8.0, adjustment_pp: 3.0}   # muito imprevisivel
+      - {threshold: 6.0, adjustment_pp: 2.0}
+      - {threshold: 4.0, adjustment_pp: 1.0}
+
+  # ── Curva nao-linear de depreciacao por KM ─────────────────────────────────
+  # Substitui o fator linear unico por marca por uma curva piecewise calibrada
+  # empiricamente (3k vendas reais). A curva descreve a depreciacao marginal
+  # do "brand default"; cada marca recebe um multiplicador = FATOR_KM[canal][brand]
+  # / FATOR_KM_DEFAULT[canal]. Com enabled=false, o codigo volta ao modelo linear.
+  km_curve:
+    enabled: true
+    segments:
+      - {km_max:    20000, pp_per_10k: 0.5}   # 0-20k: quase sem depreciacao
+      - {km_max:    50000, pp_per_10k: 1.2}   # 20-50k: rampa
+      - {km_max:   100000, pp_per_10k: 1.6}   # 50-100k: pico (maior decay)
+      - {km_max:   160000, pp_per_10k: 1.0}   # 100-160k: suaviza
+      - {km_max: 10000000, pp_per_10k: 0.7}   # >160k: plato (carro ja velho)
+
+  # ── Brand tier (Alavanca B) — ajuste de agressividade por marca ─────────────
+  # Marcas "SAFE" (alta retencao de valor) recebem ajuste NEGATIVO na margem-alvo,
+  # o que eleva o valor oferecido na troca. Marcas "RISKY" (giro lento, muita
+  # Revenda) recebem ajuste POSITIVO, reduzindo agressividade.
+  # Calibrado a partir de 2.280 vendas (2025): SAFE tem Revenda share 19-39%,
+  # RISKY 65-81%. Ver tests/backtests/analyze_revenda_profile.py.
+  brand_tier:
+    enabled: true
+    safe_brands: ["TOYOTA", "HONDA", "HYUNDAI"]
+    risky_brands: ["FORD", "PEUGEOT", "RENAULT", "CITROEN"]
+    # Calibrado pelo A/B backtest (1.970 avaliacoes com canal real):
+    # SAFE: 0.0 - equipe ja precifica SAFE certo historicamente
+    #        (bias controle Loja +0.02%, Revenda +1.17%). Aplicar -2pp
+    #        piorava MAPE em +0.41pp Loja.
+    # RISKY: +2.0 - reduz MAPE em 1.2-1.7pp cortando overpay sistematico
+    #        (controle Loja +8.46%, Revenda +13.19% bias).
+    safe_adjustment_pp: 0.0        # SAFE baseline ja precifica correto
+    risky_adjustment_pp: 2.0       # margem-alvo maior -> troca mais conservadora
+    neutral_adjustment_pp: 0.0
+    # JEEP fica NEUTRAL de proposito: Jeep novo (0-4 anos) se comporta como SAFE
+    # (24-37% Revenda), Jeep antigo (8+ anos) 100% Revenda. A tabela de
+    # probabilidade por canal (channel_probability) ja captura essa dinamica
+    # naturalmente via buckets de idade/km.
+
+  # ── Channel probability (Alavanca A) — P(Revenda) por perfil ───────────────
+  # Predicao calibrada: brand_tier x km_bucket x age_bucket -> P(Revenda).
+  # Tabelas vivem em grand_brasil/utils/channel_probability.py (constantes
+  # empiricas). Aqui so expomos o toggle e o threshold do "perfil Revenda".
+  channel_probability:
+    enabled: true
+    revenda_profile_threshold: 0.70   # carros com P(Revenda) >= 70% recebem badge
+
+  # ── Premio de blindagem (R$) adicionado ao preco estimado de venda ─────────
+  # Aplicado tanto para Loja quanto Revenda quando request.blindado = True.
+  # Anos nao listados: premio = 0 (sem efeito).
+  # Calibrado empiricamente em abr/2026 a partir de 188 candidatos a blindado
+  # detectados nas vendas Loja (canal onde 87% dos blindados sao vendidos).
+  # Veja tests/backtests/analyze_blindado_premium.py para metodologia.
+  blindado:
+    premium_by_year:
+      2026: 25000   # extrapolado da tendencia 2024-2025 (sem vendas 2026 ainda)
+      2025: 25000   # empirico Loja: R$ 23.986 (n=20)
+      2024: 25000   # empirico Loja: R$ 23.005 (n=22)
+      2023: 20000   # empirico Loja: R$ 19.395 (n=28)
+      2022: 20000   # empirico Loja: R$ 17.635 (n=28)
+      2021: 20000   # empirico Loja: R$ 20.500 (n=14)
+      2020: 15000   # empirico Loja: R$ 16.495 (n=16)
+      2019: 15000   # empirico Loja: R$ 16.000 (n=29)
+      2018: 15000   # empirico Loja: R$ 14.000 (n=20)
+      2017: 10000   # empirico Loja: R$ 11.500 (n=1, ruidoso)
+      2016: 15000   # empirico Loja: R$ 17.490 (n=3, ruidoso)
+      2015: 20000   # empirico Loja: R$ 18.995 (n=6)
+      2014: 10000   # empirico Loja: R$ 12.900 (n=1, ruidoso)

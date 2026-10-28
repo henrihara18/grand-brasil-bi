@@ -5,7 +5,11 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 
-from grand_brasil.analysis.appraisal import appraise, _calc_max_trade, _round_to_500, _remove_blindados, _blindado_premium
+from grand_brasil.analysis.appraisal import appraise, _calc_max_trade, _round_to_500
+from grand_brasil.analysis._blindado import (
+    _blindado_filter_premium as _blindado_premium,
+    remove_blindados as _remove_blindados,
+)
 from grand_brasil.models.appraisal import AppraisalRequest, AppraisalSuggestion
 
 
