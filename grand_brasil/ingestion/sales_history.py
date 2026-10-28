@@ -19,6 +19,7 @@ SALES_COLUMN_MAP = {
     "Modelo": "modelo_full",       # Full model description (for trim extraction)
     "Shortname": "shortname",      # Short model name (for trim extraction)
     "Modelo.1": "year_model",
+    "Modelo(year)": "year_model",
     "KM": "km",
     "Vl Venda": "sale_price",
     "Custo": "purchase_cost",
@@ -30,7 +31,8 @@ SALES_COLUMN_MAP = {
     "% MF": "margin_percent",
     "Margem Final": "margin_final",
     "Dt Venda": "sale_date",
-    "Situação": "sale_channel",     # "Loja" or "Revenda"
+    "Situação": "sale_channel",
+    "Situa\u00e7\u00e3o": "sale_channel",
     "Loja Venda": "store",
     "Cor": "color",
     "Placa": "plate",
@@ -120,6 +122,15 @@ def load_sales_history(
 
     # Build model_trim column (MODELO RED + extracted trim)
     _add_model_trim(df)
+
+    # Apply generation / body-style splits (TIGUAN ALLSPACE, TUCSON T-GDI,
+    # YARIS SEDAN, OUTLANDER SPORT). Must run AFTER trim extraction so that
+    # model_trim is in a known state when we realign it.
+    from grand_brasil.utils.model_generation import apply_generation_split_df
+    if "modelo_full" in df.columns:
+        apply_generation_split_df(df, source_col="modelo_full",
+                                  model_red_col="model_red",
+                                  model_trim_col="model_trim")
 
     logger.info(f"Sales history cleaned: {len(df)} valid rows")
     return df
