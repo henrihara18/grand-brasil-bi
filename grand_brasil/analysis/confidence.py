@@ -79,9 +79,25 @@ class Signals:
         ]
 
 
+KM_OUT_MARGIN = 25_000
+
+
+def km_out_of_range(km, km_min, km_max, margin: int = KM_OUT_MARGIN) -> bool:
+    """True when the car's KM sits more than `margin` outside the comparables' KM range."""
+    vals = [km, km_min, km_max]
+    if any(v is None or (isinstance(v, float) and np.isnan(v)) for v in vals):
+        return False
+    return float(km) < float(km_min) - margin or float(km) > float(km_max) + margin
+
+
+def _tier_label(tier, km, km_min, km_max) -> str:
+    t = "none" if tier is None or (isinstance(tier, float) and np.isnan(tier)) or str(tier).lower() in ("nan", "none", "") else str(tier)
+    return f"{t}|km_fora" if km_out_of_range(km, km_min, km_max) else t
+
+
 def signals_from_suggestion(s) -> Signals:
     return Signals(
-        tier=str(s.buy_ratio_tier or "none"),
+        tier=_tier_label(s.buy_ratio_tier, s.km, getattr(s, "buy_ratio_km_min", None), getattr(s, "buy_ratio_km_max", None)),
         divergence=divergence_bucket(s.anchor_divergence_pct),
         width=width_bucket(
             float(s.buy_ratio_low) if s.buy_ratio_low else None,
@@ -93,11 +109,9 @@ def signals_from_suggestion(s) -> Signals:
 
 
 def signals_from_row(r) -> Signals:
-    tier = r.get("buy_ratio_tier")
-    if tier is None or (isinstance(tier, float) and np.isnan(tier)) or str(tier).lower() in ("nan", "none", ""):
-        tier = "none"
+    tier = _tier_label(r.get("buy_ratio_tier"), r.get("km"), r.get("buy_ratio_km_min"), r.get("buy_ratio_km_max"))
     return Signals(
-        tier=str(tier),
+        tier=tier,
         divergence=divergence_bucket(r.get("anchor_divergence_pct")),
         width=width_bucket(r.get("buy_ratio_low"), r.get("buy_ratio_high"), r.get("buy_ratio_price")),
         closed=closed_bucket(r.get("buy_ratio_closed_n")),
@@ -186,6 +200,7 @@ _LABELS = {
     "year_pm1_km12k": "ano ±1, KM ±12k", "year_pm2_km24k": "ano ±2, KM ±24k", "model_fallback": "modelo, qualquer KM",
     "none": "sem histórico de compra",
 }
+_LABELS.update({f"{k}|km_fora": f"{v}, KM fora da faixa dos comparáveis" for k, v in list(_LABELS.items())})
 
 
 def _describe(s: Signals, key: tuple[str, ...]) -> str:

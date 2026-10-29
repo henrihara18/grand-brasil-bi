@@ -18,7 +18,12 @@ from typing import Callable, Optional
 import pandas as pd
 
 from grand_brasil.analysis.appraisal import appraise
-from grand_brasil.analysis.purchase_ratio import compute_brand_year_profile, compute_km_slope, compute_year_ratio_profile
+from grand_brasil.analysis.purchase_ratio import (
+    compute_brand_year_profile,
+    compute_km_slope,
+    compute_km_slope_piecewise,
+    compute_year_ratio_profile,
+)
 from grand_brasil.backtest.dataset import normalize_plate
 from grand_brasil.config import AppraisalConfig
 from grand_brasil.models.appraisal import AppraisalRequest, AppraisalSuggestion
@@ -68,8 +73,12 @@ def run_backtest(
         cutoff = month.start_time
         train_sales = sales[sales["sale_date"] < cutoff]
         train_appr = appr[appr["appraisal_date"] < cutoff]
-        profile = compute_year_ratio_profile(train_appr)
-        km_slope = compute_km_slope(train_appr) if getattr(cfg.buy_ratio, 'km_adjust', False) else None
+        profile = compute_year_ratio_profile(train_appr, min_rows=getattr(cfg.buy_ratio, 'year_profile_min_rows', 1))
+        if getattr(cfg.buy_ratio, 'km_adjust', False):
+            km_slope = (compute_km_slope_piecewise(train_appr, list(cfg.buy_ratio.km_piecewise_breaks))
+                        if getattr(cfg.buy_ratio, 'km_adjust_mode', 'linear') == 'piecewise' else compute_km_slope(train_appr))
+        else:
+            km_slope = None
         brand_profile = compute_brand_year_profile(train_appr) if getattr(cfg.buy_ratio, 'year_profile_by_brand', False) else None
         model_volume = train_sales["model_red"].value_counts()
         month_cases = cases[cases["appraisal_date"].dt.to_period("M") == month]
@@ -84,7 +93,7 @@ def run_backtest(
                 estimated_repair_cost=Decimal(str(float(c.get("expected_repair_cost") or 0.0) if pd.notna(c.get("expected_repair_cost")) else 0.0)),
                 fipe_price=Decimal(str(float(c["fipe_value"]))),
                 blindado=bool(c.get("blindado_flag")) if pd.notna(c.get("blindado_flag")) else False,
-                purpose=opts.purpose,
+                purpose=("revenda" if str(c.get("purpose", "")).upper() == "REPASSE" else "auto") if opts.purpose == "from_case" else opts.purpose,
             )
             try:
                 s = appraise(
@@ -120,6 +129,10 @@ def run_backtest(
                 "buy_ratio_low": float(s.buy_ratio_low) if s.buy_ratio_low else None,
                 "buy_ratio_high": float(s.buy_ratio_high) if s.buy_ratio_high else None,
                 "buy_ratio_tier": s.buy_ratio_tier or "none",
+                "buy_ratio_km_min": s.buy_ratio_km_min,
+                "buy_ratio_km_max": s.buy_ratio_km_max,
+                "buy_ratio_purpose_filtered": s.buy_ratio_purpose_filtered,
+                "request_purpose": ("revenda" if str(c.get("purpose", "")).upper() == "REPASSE" else "auto") if opts.purpose == "from_case" else opts.purpose,
                 "buy_ratio_n": s.buy_ratio_sample_size,
                 "buy_ratio_closed_n": s.buy_ratio_closed_deal_count,
                 "blended": float(s.blended_max_trade_value) if s.blended_max_trade_value else None,

@@ -560,9 +560,11 @@ Calibração walk-forward com os 4.025 casos (abr/2025 → out/2026), medida nos
 
 | nível | regra | cobertura | MAPE | ±5 % | ±10 % |
 |---|---|---|---|---|---|
-| **alta** | q90 do perfil ≤ 10 % | **30 %** | 4,7 % | 65 % | **89 %** |
-| **média** | 10 % < q90 ≤ 15 % | 35 % | 5,7 % | 55 % | 84 % |
-| **baixa** | q90 > 15 % ou sem perfil | 35 % | 9,1 % | 40 % | 67 % |
+| **alta** | q90 do perfil ≤ 10 % | **34 %** | 4,6 % | 66 % | **90 %** |
+| **média** | 10 % < q90 ≤ 15 % | 33 % | 6,0 % | 54 % | 81 % |
+| **baixa** | q90 > 15 %, sem perfil, ou KM fora da faixa dos comparáveis | 33 % | 9,0 % | 40 % | 68 % |
+
+(Recalibrado em 29/10 após a análise forense — seção 4.7; antes: alta 30 % / 89 %.)
 
 Curva cobertura × precisão (liberando as avaliações da faixa prevista mais estreita para a mais larga):
 
@@ -585,6 +587,37 @@ com estes dados: nem o avaliador humano chega lá (62 %). O que o modelo entrega
 (2 em 3 dentro de ±5 %)**; em 50 %, ainda 89 % dentro de ±10 %. Para chegar a ±5 % em 90 % num
 subconjunto relevante, faltam variáveis que o modelo não vê (estado real do carro, procedência,
 negociação) e o alvo precisa ser menos ruidoso (valor real pago via feedback, não a venda futura).
+
+### 4.7 Análise forense (29/10/2026): onde o algoritmo erra feio, e o que foi feito
+
+Dissecados os 12 maiores desvios (algoritmo × mesa) de Hyundai/Toyota/BYD em 2026, com os
+comparáveis exatos que o motor usou, e cruzados os 823 casos dessas marcas. Contexto: nessas
+marcas o algoritmo fica a ±5 % da mesa em 61 % e a ±10 % em 84 % dos casos; em showroom→loja,
+70 % / 91 %. Os buracos estão nas bordas:
+
+| # | buraco | evidência | tamanho | ação |
+|---|---|---|---|---|
+| 1 | **Curva de ano com célula vazia** — a mediana por ano não exigia amostra mínima; em junho a célula "2027" tinha 2 carros (0,674) e aplicava −0,20 ao ratio de todo carro desse ano | Dolphin Mini 2027: mesa 120k, algoritmo 84k → com a correção **102k** (ideal 104k) | 8 casos de ano seguinte em 2026, MAPE 11,6 % | **corrigido** (`year_profile_min_rows: 30`) |
+| 2 | **Mesmo carro contado duas vezes** — AVALIADO + UTILIZADO/REPASSE da mesma placa (13,7 % das linhas têm outra avaliação da mesma placa em ≤30 d) | Etios 2018: duas linhas a 0,573 do mesmo carro entre 6 comparáveis; 43,5k → **47k** com dedup | amostras pequenas | **corrigido** (`dedupe_by_plate`) |
+| 3 | **"Valor avaliado" errado** — 2,6 % das fechadas diferem >5 % do custo ajustado da venda | Corolla Altis 2023 "pago 85k" (58 % da FIPE) vendido a 148k com 9,9 %: custo real 131k; a linha errada virou comparável do Corolla seguinte | 135 linhas | **corrigido** (`reconcile_paid_with_sales` + piso por idade só para linhas não confirmadas pela venda) |
+| 4 | **KM muito fora da faixa dos comparáveis** — inclinação linear extrapolada de 60k para 300k | HB20 2022 c/ 309 mil km: mesa 27k, algoritmo 38,5k; Elantra 227 mil km: 42k vs 57,5k | 6 % dos casos (KM > 150k), MAPE 8,7 % | inclinação por faixa implementada (`km_adjust_mode: piecewise`) — **neutra no backtest, fica desligada**; o que resolve é o **sinal "KM fora da faixa"** na confiança (perfil próprio → cai para baixa) |
+| 5 | **Finalidade REPASSE** — a mesa paga atacado, os comparáveis misturam showroom | 31 % das avaliações; algoritmo +2,8 % acima da mesa nelas | REPASSE→Revenda MAPE 8,7 % | comparáveis por finalidade implementados (`purpose_aware`) — viés da Revenda cai de +1,5 % para +1,0 %, mas Loja piora 0,1 pp e o total não melhora: **fica desligado** |
+| 6 | **Versão dentro da família** (Song Pro GS vs GL, Corolla Altis Premium/Híbrido, FIPE de versão errada) | Song Pro 2025 GS: mesa 190k, vendido 216k, algoritmo 140k (comparáveis GL) | BYD/Toyota premium | **pendente** (acabamento no shortname para BYD e Corolla Altis) |
+| 7 | **FIPE descolada do mercado** (ano seguinte inflada; BYD caindo) | Song Pro 2027: FIPE 237k, mesa 160k, vendido 167k; Song Plus 2024: FIPE 167k, atacado 125k | BYD, 0 km | **pendente** (cheque FIPE × vendas recentes do modelo-ano; pesar mais a âncora B) |
+| 8 | **Ofertas não fechadas dominando modelo raro** (<3 fechadas) | Etios 2017: 1 fechada + 8 ofertas → 53,5k vs mesa 40k | <5 fechadas: MAPE 6,2 % vs 4,0 % com 5–9 | já cai em confiança baixa; regra de "sugestão, não preço" |
+| 9 | **Não é buraco: a mesa pagou acima da FIPE** (0 km, troca na venda de novo) | HB20S 0 km a 114 % da FIPE, margem −1,1 %; Dolphin 2027 a 106 %, −3,5 % | 27 casos >95 % da FIPE, metade com margem negativa | alerta na tela "mesa acima da FIPE" (pendente) |
+
+**Resultado das correções 1–3 na régua:** neutras no erro médio (6,4 % → 6,4 % nos mesmos
+casos) — o que mudou foi a **cauda**: os casos pontuais acima deixam de acontecer e a base de
+comparáveis fica sem lançamentos errados. Honestidade metodológica: na primeira medição o piso
+por idade também tirou 17 casos do **teste** (erro de 23 %, pago a 56 % da FIPE) e isso derrubava
+o MAPE para 6,4 % sem mérito do modelo; a versão final aplica a higiene só à base de comparáveis
+e mantém todos os casos na régua.
+
+**Régua após a forense (mesmos 2.138 casos de 2026):** MAPE **6,5 %** · ±3 % **36 %** · ±5 %
+**54 %** · ±10 % 80 % · viés +0,2 % (antes da forense: 6,6 / 35 / 53 / 80). Confiança recalibrada
+com o sinal "KM fora da faixa": **alta cobre 34 % com 90 % dentro de ±10 %** (era 30 %); os perfis
+"KM fora" têm q90 de 19–24 % e caem em baixa (114 casos em 2026).
 
 ---
 

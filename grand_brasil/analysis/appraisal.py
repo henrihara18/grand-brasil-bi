@@ -1011,7 +1011,16 @@ def _apply_buy_ratio(
         reference_date=reference_date,
         km_slope=km_slope,
         brand_year_profile=brand_year_profile,
+        prefer_purpose=(
+            "REPASSE"
+            if (appraisal_config is not None and getattr(appraisal_config.buy_ratio, "purpose_aware", False)
+                and (request.purpose or "auto").lower() == "revenda")
+            else None
+        ),
     )
+    suggestion.buy_ratio_km_min = buy_result.km_min_used
+    suggestion.buy_ratio_km_max = buy_result.km_max_used
+    suggestion.buy_ratio_purpose_filtered = buy_result.purpose_filtered
 
     if not buy_result.available:
         suggestion.buy_ratio_description = buy_result.description

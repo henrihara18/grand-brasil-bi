@@ -26,7 +26,12 @@ from grand_brasil.backtest.fipe_table import FipeTable, TableFipeClient  # noqa:
 from grand_brasil.backtest.metrics import add_errors, all_breakdowns, fmt_summary, summarize, table_md  # noqa: E402
 from grand_brasil.backtest.runner import RunOptions, run_backtest  # noqa: E402
 from grand_brasil.config import load_config  # noqa: E402
-from grand_brasil.ingestion.appraisal_history import load_appraisal_history, merge_with_legacy  # noqa: E402
+from grand_brasil.ingestion.appraisal_history import (  # noqa: E402
+    drop_implausible_ratios,
+    load_appraisal_history,
+    merge_with_legacy,
+    reconcile_with_sales,
+)
 from grand_brasil.ingestion.sales_history import load_sales_history  # noqa: E402
 
 
@@ -40,7 +45,8 @@ def main() -> None:
     ap.add_argument("--max-lag-days", type=int, default=365)
     ap.add_argument("--targets-until", default=None,
                     help="margens-alvo Loja a partir das vendas anteriores a esta data (default: --test-start)")
-    ap.add_argument("--purpose", default="auto", choices=["auto", "loja", "revenda"])
+    ap.add_argument("--purpose", default="auto", choices=["auto", "loja", "revenda", "from_case"],
+                    help="from_case = Revenda quando a avaliacao foi lancada como REPASSE (o que o avaliador escolheria na tela)")
     ap.add_argument("--keep-same-plate", action="store_true", help="nao excluir avaliacoes anteriores do mesmo carro")
     ap.add_argument("--limit", type=int, default=None, help="rodar so os N primeiros casos (debug)")
     ap.add_argument("--out", default="backtest_results")
@@ -70,6 +76,9 @@ def main() -> None:
             parsed = int(value)
         elif isinstance(current, float) or current is None:
             parsed = float(value)
+        elif isinstance(current, dict):
+            import json
+            parsed = {int(k) if str(k).lstrip("-").isdigit() else k: v for k, v in json.loads(value).items()}
         else:
             parsed = value
         setattr(target, attr, parsed)
@@ -83,11 +92,18 @@ def main() -> None:
     legacy = ROOT / cfg.appraisal_legacy_file
     if legacy.exists():
         appr = merge_with_legacy(appr, load_appraisal_history(legacy, status_weights=weights), cfg.appraisal_legacy_until)
+    if cfg.reconcile_paid_with_sales:
+        appr = reconcile_with_sales(appr, sales, cfg.reconcile_tolerance)
+        print(f"  reconciliacao com custo da venda: {int((appr['paid_source'] == 'venda').sum())} valores corrigidos")
+    appr_cases = appr   # evaluation cases keep every closed deal (with reconciled paid values)
+    if cfg.ratio_floor_by_age:
+        before = len(appr); appr = drop_implausible_ratios(appr, cfg.ratio_floor_by_age)
+        print(f"  ratios implausiveis removidos da base de comparaveis: {before - len(appr)}")
     print(f"dados: {len(sales)} vendas, {len(appr)} avaliacoes ({time.time() - t0:.0f}s)")
 
     test_start, test_end = pd.Timestamp(args.test_start), pd.Timestamp(args.test_end)
     targets = loja_margin_targets(sales, until=pd.Timestamp(args.targets_until) if args.targets_until else test_start)
-    cases = add_targets(link_cases(appr, sales, test_start, test_end, args.max_lag_days), targets)
+    cases = add_targets(link_cases(appr_cases, sales, test_start, test_end, args.max_lag_days), targets)
     if args.limit:
         cases = cases.head(args.limit)
     print(f"casos: {len(cases)} avaliacoes fechadas em [{test_start:%d/%m/%Y}, {test_end:%d/%m/%Y}) com venda posterior")

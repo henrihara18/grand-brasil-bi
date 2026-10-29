@@ -27,12 +27,15 @@ from grand_brasil.analysis.confidence import ConfidenceModel
 from grand_brasil.analysis.purchase_ratio import (
     compute_brand_year_profile,
     compute_km_slope,
+    compute_km_slope_piecewise,
     compute_year_ratio_profile,
 )
 from grand_brasil.config import Settings
 from grand_brasil.ingestion.appraisal_history import (
+    drop_implausible_ratios,
     load_appraisal_history,
     merge_with_legacy,
+    reconcile_with_sales,
 )
 from grand_brasil.ingestion.fipe_client import FipeApiError, FipeClient
 from grand_brasil.ingestion.sales_history import load_sales_history
@@ -209,13 +212,31 @@ def _load_appraisals_from_gdrive(
         os.unlink(tmp_path)
 
 
-def get_year_profile(appraisal_df: Optional[pd.DataFrame]) -> Optional[dict]:
+def apply_appraisal_hygiene(appraisal_df: Optional[pd.DataFrame], sales_df: Optional[pd.DataFrame], config: Settings) -> Optional[pd.DataFrame]:
+    """Reconcile 'valor avaliado' with sale costs and drop implausible ratios (config-gated, cached)."""
+    if appraisal_df is None:
+        return None
+    if st.session_state.get("appraisal_hygiene_done"):
+        return st.session_state["appraisal_df"]
+    cfg = config.app.appraisal
+    df = appraisal_df
+    if cfg.reconcile_paid_with_sales and sales_df is not None:
+        df = reconcile_with_sales(df, sales_df, cfg.reconcile_tolerance)
+    if cfg.ratio_floor_by_age:
+        df = drop_implausible_ratios(df, cfg.ratio_floor_by_age)
+    st.session_state["appraisal_df"] = df
+    st.session_state["appraisal_hygiene_done"] = True
+    return df
+
+
+def get_year_profile(appraisal_df: Optional[pd.DataFrame], config: Optional[Settings] = None) -> Optional[dict]:
     """Cache the per-year ratio profile (avoids recomputing each request)."""
     if appraisal_df is None:
         return None
     if "appraisal_year_profile" in st.session_state:
         return st.session_state["appraisal_year_profile"]
-    profile = compute_year_ratio_profile(appraisal_df)
+    min_rows = config.app.appraisal.buy_ratio.year_profile_min_rows if config is not None else 1
+    profile = compute_year_ratio_profile(appraisal_df, min_rows=min_rows)
     st.session_state["appraisal_year_profile"] = profile
     return profile
 
@@ -225,7 +246,11 @@ def get_km_slope(appraisal_df: Optional[pd.DataFrame], config: Settings) -> Opti
     if appraisal_df is None or not config.app.appraisal.buy_ratio.km_adjust:
         return None
     if "appraisal_km_slope" not in st.session_state:
-        st.session_state["appraisal_km_slope"] = compute_km_slope(appraisal_df)
+        br = config.app.appraisal.buy_ratio
+        st.session_state["appraisal_km_slope"] = (
+            compute_km_slope_piecewise(appraisal_df, list(br.km_piecewise_breaks))
+            if br.km_adjust_mode == "piecewise" else compute_km_slope(appraisal_df)
+        )
     return st.session_state["appraisal_km_slope"]
 
 

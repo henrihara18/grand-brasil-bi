@@ -252,6 +252,75 @@ def merge_with_legacy(
     return merged
 
 
+def reconcile_with_sales(
+    appraisal_df: pd.DataFrame,
+    sales_df: pd.DataFrame,
+    tolerance: float = 0.05,
+    max_lag_days: int = 365,
+) -> pd.DataFrame:
+    """Use the sale's adjusted cost as 'what we paid' when the appraisal record disagrees.
+
+    For closed deals whose plate shows up in a sale within `max_lag_days`, the
+    accounting cost is the truth; 94% already match within 2%, the rest are
+    typing errors (a 2023 Corolla recorded at 58% of FIPE). `paid_source` is
+    "confirmado" when the sale agrees with the record, "venda" when the sale
+    cost replaced it (ratio recomputed), "avaliacao" when no sale matched.
+    """
+    if appraisal_df.empty or sales_df is None or sales_df.empty:
+        return appraisal_df
+    df = appraisal_df.copy()
+    df["paid_source"] = "avaliacao"
+    closed = df["status_norm"].isin({"UTILIZADO", "REPASSE"}) & df["plate"].notna() & df["appraisal_date"].notna()
+    if not closed.any():
+        return df
+    norm = lambda s: s.astype(str).str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
+    left = df[closed][["plate", "appraisal_date"]].copy()
+    left["_plate"] = norm(left["plate"])
+    left["_idx"] = left.index
+    sales = sales_df[sales_df["sale_date"].notna() & sales_df["plate"].notna()][["plate", "sale_date", "adjusted_cost"]].copy()
+    sales["_plate"] = norm(sales["plate"])
+    merged = pd.merge_asof(
+        left.sort_values("appraisal_date"), sales.sort_values("sale_date").drop(columns=["plate"]),
+        left_on="appraisal_date", right_on="sale_date", by="_plate", direction="forward",
+        tolerance=pd.Timedelta(days=max_lag_days),
+    )
+    merged = merged[merged["adjusted_cost"].notna() & (merged["adjusted_cost"] > 0)].set_index("_idx")
+    paid = df.loc[merged.index, "appraised_value"]
+    off = (paid - merged["adjusted_cost"]).abs() / merged["adjusted_cost"] > tolerance
+    df.loc[merged.index[~off], "paid_source"] = "confirmado"
+    fix_idx = merged.index[off]
+    df.loc[fix_idx, "appraised_value"] = merged.loc[fix_idx, "adjusted_cost"]
+    df.loc[fix_idx, "paid_source"] = "venda"
+    df.loc[fix_idx, "ratio"] = df.loc[fix_idx, "appraised_value"] / df.loc[fix_idx, "fipe_value"]
+    logger.info(f"Reconciled {len(fix_idx)} appraisals with the sale cost (of {len(merged)} matched)")
+    return df
+
+
+def drop_implausible_ratios(appraisal_df: pd.DataFrame, floor_by_age: dict[int, float]) -> pd.DataFrame:
+    """Drop closed deals whose ratio is below the empirical floor for the car's age.
+
+    `floor_by_age` maps the maximum age of a bracket to its floor, e.g.
+    {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40} (P1 of closed deals).
+    AVALIADO offers are left alone (a low offer that did not close is real), and
+    so are closed deals whose paid value the later sale confirmed (`paid_source`
+    "confirmado" or "venda"): a 300k-km car bought at 46% of FIPE is extreme, not an error.
+    """
+    if not floor_by_age or appraisal_df.empty:
+        return appraisal_df
+    df = appraisal_df
+    unconfirmed = ~df["paid_source"].isin({"confirmado", "venda"}) if "paid_source" in df.columns else pd.Series(True, index=df.index)
+    age = (pd.to_datetime(df["appraisal_date"], errors="coerce").dt.year - df["year_model"].astype(float)).fillna(0).clip(lower=0)
+    edges = sorted(int(k) for k in floor_by_age)
+    floors = pd.Series(min(floor_by_age.values()), index=df.index, dtype=float)
+    for max_age in reversed(edges):
+        floors = floors.where(age > max_age, float(floor_by_age[max_age]))
+    closed = df["status_norm"].isin({"UTILIZADO", "REPASSE"})
+    drop = closed & unconfirmed & (df["ratio"] < floors)
+    if drop.any():
+        logger.info(f"Dropped {int(drop.sum())} closed deals with implausible ratio for their age")
+    return df[~drop].copy()
+
+
 def detect_layout(columns) -> str:
     """Return "v2" for the appraisal-platform export, "legacy" otherwise."""
     normed = {_norm(c) for c in columns}

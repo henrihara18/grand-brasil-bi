@@ -66,6 +66,9 @@ class BuyRatioResult:
     year_delta_applied: bool = False           # Whether a year adjustment was used
     model_key_used: str = ""                   # model_red actually matched in the base
     shrink_weight: Optional[float] = None      # weight of the local median after shrinkage (1 = none)
+    km_min_used: Optional[int] = None          # KM range of the comparables behind the ratio
+    km_max_used: Optional[int] = None
+    purpose_filtered: bool = False             # comparables restricted to the requested purpose (REPASSE)
     prior_ratio: Optional[float] = None        # prior the ratio was shrunk toward
     family_fallback: bool = False              # True when trim had no rows and the family was used
     description: str = ""                      # Human-readable explanation
@@ -90,8 +93,11 @@ class BuyRatioResult:
 
 # ── Year-delta adjustment ───────────────────────────────────────────────────
 
-def compute_year_ratio_profile(appraisal_df: pd.DataFrame) -> dict[int, float]:
+def compute_year_ratio_profile(appraisal_df: pd.DataFrame, min_rows: int = 1) -> dict[int, float]:
     """Compute the weighted median ratio per year_model across the whole appraisal base.
+
+    Cells with fewer than `min_rows` appraisals are left out: a next-model-year
+    cell with two cars once produced a −0.20 'adjustment' for every car of that year.
 
     Uses the `weight` column if present (closed deals count full, offered
     appraisals count 0.4) so the empirical year-curve isn't pulled by
@@ -108,6 +114,8 @@ def compute_year_ratio_profile(appraisal_df: pd.DataFrame) -> dict[int, float]:
     has_weights = "weight" in df.columns
 
     for year, group in df.groupby("year_model"):
+        if len(group) < min_rows:
+            continue
         if has_weights:
             median = _weighted_quantile(group["ratio"], group["weight"], 0.50)
         else:
@@ -181,6 +189,7 @@ def compute_buy_ratio(
     reference_date: Optional[pd.Timestamp] = None,
     km_slope: Optional[float] = None,
     brand_year_profile: Optional[dict[str, dict[int, float]]] = None,
+    prefer_purpose: Optional[str] = None,
 ) -> BuyRatioResult:
     """Find comparables in the appraisal base and return a buy-ratio estimate.
 
@@ -212,11 +221,13 @@ def compute_buy_ratio(
     halflife = getattr(config, "recency_halflife_days", None) if config is not None else None
     km_adjust = bool(getattr(config, "km_adjust", False)) if config is not None else False
     by_brand = bool(getattr(config, "year_profile_by_brand", False)) if config is not None else False
+    profile_min_rows = int(getattr(config, "year_profile_min_rows", 1)) if config is not None else 1
+    dedupe = bool(getattr(config, "dedupe_by_plate", False)) if config is not None else False
     year_scale = float(getattr(config, "year_adjust_scale", 1.0)) if config is not None else 1.0
     shrink_k = float(getattr(config, "shrink_k", 0.0)) if config is not None else 0.0
 
     if year_profile is None:
-        year_profile = compute_year_ratio_profile(appraisal_df)
+        year_profile = compute_year_ratio_profile(appraisal_df, min_rows=profile_min_rows)
     if by_brand and brand_year_profile is None:
         brand_year_profile = compute_brand_year_profile(appraisal_df)
     if not by_brand:
@@ -226,6 +237,14 @@ def compute_buy_ratio(
     model_key, candidates = _resolve_model_key(requested_key, appraisal_df)
     if candidates.empty:
         return BuyRatioResult(description=f"Sem avaliacoes historicas para {requested_key}.")
+    if dedupe:
+        candidates = _dedupe_by_plate(candidates)
+    purpose_filtered = False
+    if prefer_purpose and "purpose" in candidates.columns:
+        same_purpose = candidates[candidates["purpose"].astype(str).str.upper() == prefer_purpose.upper()]
+        if len(same_purpose) >= min_tier:
+            candidates = same_purpose
+            purpose_filtered = True
 
     if halflife and "appraisal_date" in candidates.columns:
         candidates = _apply_recency(candidates, reference_date or pd.Timestamp.now(), float(halflife))
@@ -241,12 +260,38 @@ def compute_buy_ratio(
         shrink_k=shrink_k,
     )
     result.model_key_used = model_key
+    result.purpose_filtered = purpose_filtered
+    if len(result.comparables) and "km" in result.comparables.columns:
+        kms = pd.to_numeric(result.comparables["km"], errors="coerce").dropna()
+        if len(kms):
+            result.km_min_used, result.km_max_used = int(kms.min()), int(kms.max())
+    if purpose_filtered:
+        result.description += f" Comparaveis restritos a finalidade {prefer_purpose.upper()}."
     if model_key != requested_key:
         result.family_fallback = True
         result.description += (
             f" Acabamento {requested_key} sem historico proprio — usada a familia {model_key}."
         )
     return result
+
+
+def _dedupe_by_plate(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per car: the closed deal if there is one, otherwise the latest appraisal.
+
+    13.7% of the base is the same plate appraised again within 30 days (another
+    store, or the AVALIADO offer followed by the UTILIZADO/REPASSE close); with
+    5-8 comparables a duplicate weighs 25-40% of the median.
+    """
+    if "plate" not in df.columns or df.empty:
+        return df
+    plate = df["plate"].astype(str).str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
+    valid = plate.str.len() >= 6
+    closed = df["status_norm"].isin({"UTILIZADO", "REPASSE"}) if "status_norm" in df.columns else pd.Series(True, index=df.index)
+    date = pd.to_datetime(df["appraisal_date"], errors="coerce") if "appraisal_date" in df.columns else pd.Series(pd.NaT, index=df.index)
+    ranked = df.assign(_plate=plate, _closed=closed.astype(int), _date=date)
+    keep = ranked[valid].sort_values(["_closed", "_date"], ascending=[False, False]).drop_duplicates("_plate", keep="first")
+    out = pd.concat([keep, ranked[~valid]]).drop(columns=["_plate", "_closed", "_date"])
+    return out.sort_index()
 
 
 def _resolve_model_key(requested_key: str, appraisal_df: pd.DataFrame) -> tuple[str, pd.DataFrame]:
@@ -406,14 +451,54 @@ def compute_km_slope(appraisal_df: pd.DataFrame, min_group: int = 3) -> Optional
     return float(np.clip(slope, -0.05, 0.0))
 
 
-def _apply_km_adjustment(df: pd.DataFrame, km: Optional[int], km_slope: Optional[float]) -> pd.DataFrame:
-    """Shift each comparable's ratio to the target KM using the pooled slope."""
+def compute_km_slope_piecewise(
+    appraisal_df: pd.DataFrame,
+    breaks: list[int] = (50_000, 100_000, 150_000),
+    min_group: int = 3,
+    min_band_rows: int = 200,
+) -> Optional[dict]:
+    """Slope of ratio on KM per KM band (per 10k km), each estimated within (model, year) groups.
+
+    A single slope extrapolated from 60k to 300k km understates the discount the
+    market applies to very high mileage. Bands without enough rows inherit the
+    pooled slope. Returns {"breaks": [...], "slopes": [...]} (len(slopes) = len(breaks)+1).
+    """
+    pooled = compute_km_slope(appraisal_df, min_group)
+    if pooled is None:
+        return None
+    df = appraisal_df.dropna(subset=["km", "ratio", "year_model"]).copy()
+    edges = [0, *breaks, float("inf")]
+    slopes = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        band = df[(df["km"] >= lo) & (df["km"] < hi)]
+        s = compute_km_slope(band, min_group) if len(band) >= min_band_rows else None
+        slopes.append(float(s) if s is not None else float(pooled))
+    return {"breaks": [int(b) for b in breaks], "slopes": slopes}
+
+
+def _km_delta(km_from: float, km_to: float, km_slope) -> float:
+    """Ratio change going from km_from to km_to; integrates band slopes when km_slope is piecewise."""
+    if not isinstance(km_slope, dict):
+        return float(km_slope) * (km_to - km_from) / 10_000.0
+    edges = [0.0, *[float(b) for b in km_slope["breaks"]], float("inf")]
+    lo, hi = sorted((float(km_from), float(km_to)))
+    total = 0.0
+    for a, b, s in zip(edges[:-1], edges[1:], km_slope["slopes"]):
+        seg = min(hi, b) - max(lo, a)
+        if seg > 0:
+            total += s * seg / 10_000.0
+    return total if km_to >= km_from else -total
+
+
+def _apply_km_adjustment(df: pd.DataFrame, km: Optional[int], km_slope) -> pd.DataFrame:
+    """Shift each comparable's ratio to the target KM (linear slope or piecewise bands)."""
     if km_slope is None or km is None or "km" not in df.columns:
         return df
     df = df.copy()
     col = "adjusted_ratio" if "adjusted_ratio" in df.columns else "ratio"
-    delta = km_slope * (float(km) - df["km"].astype(float)) / 10_000.0
-    df["adjusted_ratio"] = df[col] + delta.fillna(0.0)
+    comp_km = df["km"].astype(float)
+    delta = comp_km.map(lambda k: 0.0 if pd.isna(k) else _km_delta(k, float(km), km_slope))
+    df["adjusted_ratio"] = df[col] + delta
     return df
 
 

@@ -49,6 +49,7 @@ from grand_brasil.dashboard.pages._avaliacao.loaders import (
     get_confidence_model,
     get_km_slope,
     get_year_profile,
+    apply_appraisal_hygiene,
     load_appraisal_data,
     load_fipe_brands,
     load_fipe_models,
@@ -97,8 +98,8 @@ def render(config: Settings) -> None:
         "REPASSE": br_cfg.repasse_weight,
         "AVALIADO": br_cfg.avaliado_weight,
     }
-    appraisal_df = load_appraisal_data(status_weights, config)
-    appraisal_year_profile = get_year_profile(appraisal_df)
+    appraisal_df = apply_appraisal_hygiene(load_appraisal_data(status_weights, config), sales_df, config)
+    appraisal_year_profile = get_year_profile(appraisal_df, config)
     appraisal_km_slope = get_km_slope(appraisal_df, config)
     appraisal_brand_profile = get_brand_year_profile(appraisal_df, config)
     confidence_model = get_confidence_model(config)

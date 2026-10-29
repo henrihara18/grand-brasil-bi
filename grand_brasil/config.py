@@ -63,6 +63,11 @@ class BuyRatioConfig(BaseModel):
     year_profile_by_brand: bool = False              # year curve per brand instead of global
     year_adjust_scale: float = 1.0                   # 1 = full year-curve delta, 0 = none
     shrink_k: float = 0.0                            # shrink ratio toward the prior: w = n/(n+k); 0 = off
+    year_profile_min_rows: int = 1                   # year-curve cells with fewer rows are ignored (legacy 1)
+    dedupe_by_plate: bool = False                    # same car appraised twice counts once among comparables
+    km_adjust_mode: str = "linear"                   # "linear" (one slope) | "piecewise" (slope per KM band)
+    km_piecewise_breaks: list[int] = [50_000, 100_000, 150_000]
+    purpose_aware: bool = False                      # purpose=revenda -> prefer comparables appraised as REPASSE
 
 
 class FipeSpreadConfig(BaseModel):
@@ -227,6 +232,13 @@ class AppraisalConfig(BaseModel):
     headline_mode: str = "buy_ratio_first"
     ensemble_weight_buy_ratio: float = 0.7
     ensemble_weight_by_tier: dict[str, float] = {}   # optional per-tier override of the weight
+
+    # Appraisal base hygiene: replace 'valor avaliado' by the sale's adjusted cost when the
+    # plate matches a later sale and they differ by more than the tolerance; drop closed
+    # deals whose ratio is below the empirical floor for the car's age (P1 of closed deals).
+    reconcile_paid_with_sales: bool = False
+    reconcile_tolerance: float = 0.05
+    ratio_floor_by_age: dict[int, float] = {}      # {max_age: floor}, e.g. {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40}
 
     # Calibrated confidence table (written by scripts/confidence_curve.py --out)
     confidence_calibration_file: str = "data/confidence_calibration.json"

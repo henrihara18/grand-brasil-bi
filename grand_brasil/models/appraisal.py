@@ -148,6 +148,9 @@ class AppraisalSuggestion(BaseModel):
     buy_ratio_closed_deal_count: int = 0         # UTILIZADO/REPASSE count
     buy_ratio_offered_count: int = 0             # AVALIADO count (if used as fallback)
     buy_ratio_tier: Optional[str] = None         # Which matching tier produced this
+    buy_ratio_km_min: Optional[int] = None       # KM range of the comparables used
+    buy_ratio_km_max: Optional[int] = None
+    buy_ratio_purpose_filtered: bool = False     # comparables restricted to REPASSE (purpose=revenda)
     buy_ratio_description: Optional[str] = None
     buy_ratio_price: Optional[Decimal] = None    # FIPE × ratio_median
     buy_ratio_low: Optional[Decimal] = None      # FIPE × P25

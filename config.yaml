@@ -70,6 +70,9 @@ appraisal:
     year_profile_by_brand: false  # testado, sem ganho mensuravel
     recency_halflife_days: null   # testado (180 e 365 d), sem ganho
     year_adjust_scale: 1.0        # testado 0 e 0,5, sem ganho
+    # Correcoes de base (29/10/2026): neutras no erro medio, corrigem casos pontuais graves
+    year_profile_min_rows: 30     # celula de ano com <30 avaliacoes nao ajusta (evitava -0,20 em ano-modelo novo)
+    dedupe_by_plate: true         # mesma placa avaliada 2x conta uma vez entre os comparaveis
 
   # ── Destaque na tela: mistura das duas ancoras (adotado na revisao de out/2026) ──
   # 70% historico de compra + 30% analise de vendas. Backtest: MAPE 7,2% -> 6,7%,
@@ -79,6 +82,14 @@ appraisal:
   margin_basis: markup          # "sale" (margem sobre a venda, com imposto) testado: mais conservador sem ganhar
   sales_tax_pct: 0.0
   confidence_calibration_file: "data/confidence_calibration.json"
+
+  # ── Higiene da base de avaliacoes (29/10/2026) ──
+  # "Valor avaliado" vira o custo ajustado da venda quando a placa casa e os dois diferem
+  # >5% (2,6% das fechadas sao erro de lancamento); fechadas com ratio abaixo do P1 da
+  # idade saem (um 2023 pago a 58% da FIPE nao existe).
+  reconcile_paid_with_sales: true
+  reconcile_tolerance: 0.05
+  ratio_floor_by_age: {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40}
 
   # ── Fallback de spread FIPE quando nao ha historico suficiente ────────────
   # Sem historico, o spread calculado seria ruidoso. A regra de fallback
