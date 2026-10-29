@@ -103,6 +103,45 @@ GENERATION_RULES: tuple[GenerationRule, ...] = (
 )
 
 
+# Trim rules: families where the trim moves the price by ≥5% at the same model year
+# with ≥10 sales on each side (scan of 2025-2026 sales, 29/10/2026). The first
+# pattern that matches the source text wins; rows without any marker keep the
+# family key and are reached through the prefix fallback.
+TRIM_RULES: dict[str, tuple[tuple[str, str], ...]] = {
+    "HYUNDAI HB20": ((r"\bPLATINUM\b", "PLATINUM"), (r"\bPREMIUM\b", "PREMIUM"), (r"\bEVOLUTION\b", "EVOLUTION"), (r"\bSENSE\b", "SENSE")),
+    "HYUNDAI HB20S": ((r"\bPREMIUM\b", "PREMIUM"), (r"\bCOMFORT\b", "COMFORT")),
+    "HONDA HR-V": ((r"\bTOURING\b", "TOURING"), (r"\bADVANCE\b", "ADVANCE"), (r"\bEXL\b", "EXL"), (r"\bLX\b", "LX"), (r"\bEX\b", "EX")),
+    "HONDA CIVIC": ((r"\bTOURING\b", "TOURING"),),
+    "CHEVROLET ONIX": ((r"\bPREMIER\b", "PREMIER"), (r"\bLTZ\b", "LTZ"), (r"\bLT\b", "LT")),
+    "CHEVROLET TRACKER": ((r"\bPREMIER\b", "PREMIER"),),
+    "JEEP COMPASS": ((r"\bTRAILHAWK\b", "TRAILHAWK"), (r"\bSPORT\b", "SPORT"), (r"\bLONGITUDE\b", "LONGITUDE"), (r"\bLIMITED\b", "LIMITED")),
+    "JEEP RENEGADE": ((r"\bTRAILHAWK\b|\b4X4\b", "4X4"),),
+    "JEEP COMMANDER": ((r"\bDIESEL\b|\bTD380\b", "DIESEL"),),
+    "NISSAN KICKS": ((r"\bEXCLUSIVE\b", "EXCLUSIVE"), (r"\bADVANCE\b", "ADVANCE"), (r"\bSENSE\b", "SENSE")),
+    "VOLKSWAGEN NIVUS": ((r"\bHIGHLINE\b", "HIGHLINE"), (r"\bCOMFORTLINE\b", "COMFORTLINE")),
+    "VOLKSWAGEN T-CROSS": ((r"\bHIGHLINE\b", "HIGHLINE"), (r"\bCOMFORTLINE\b", "COMFORTLINE"), (r"\bSENSE\b", "SENSE")),
+    "VOLKSWAGEN POLO": ((r"\bHIGHLINE\b", "HIGHLINE"),),
+    "BMW X1": ((r"\bSPORT\b", "SPORT"),),
+    "TOYOTA COROLLA ALTIS": ((r"PREMIUM.*(HYBRID|HIBRIDO|\bHV\b)|(HYBRID|HIBRIDO|\bHV\b).*PREMIUM", "HIBRIDO PREMIUM"),
+                             (r"HYBRID|HIBRIDO|\bHV\b", "HIBRIDO"), (r"\bPREMIUM\b", "PREMIUM")),
+}
+
+
+def apply_trim_rule(model_red: str, source_text: str) -> str:
+    """Append the trim to model_red when the family has trim rules and the text carries a marker."""
+    base = _normalize(model_red)
+    src = _normalize(source_text)
+    if not base or not src:
+        return base
+    for family, rules in TRIM_RULES.items():
+        if base == family or base.startswith(family + " "):
+            for pattern, suffix in rules:
+                if re.search(pattern, src, flags=re.IGNORECASE):
+                    return f"{family} {suffix}"
+            return family if base.startswith(family + " ") and base[len(family) + 1:] in {s for _, s in rules} else base
+    return base
+
+
 def apply_generation_split(
     model_red: str,
     source_text: str,
@@ -138,8 +177,9 @@ def apply_generation_split_df(
     source_col: str,
     model_red_col: str = "model_red",
     model_trim_col: Optional[str] = "model_trim",
+    trim_rules: bool = True,
 ) -> pd.DataFrame:
-    """Apply generation-split rules to a DataFrame in-place.
+    """Apply generation-split rules (and, optionally, trim rules) to a DataFrame in-place.
 
     Also updates `model_trim` so that rows whose model_red gets rewritten
     keep a consistent trim key. Rows where model_trim was equal to the
@@ -166,13 +206,10 @@ def apply_generation_split_df(
         return df
 
     # Compute new_model_red per row
-    new_model_red = df.apply(
-        lambda r: apply_generation_split(
-            str(r.get(model_red_col, "")),
-            str(r.get(source_col, "")),
-        ),
-        axis=1,
-    )
+    def _rewrite(r):
+        mr = apply_generation_split(str(r.get(model_red_col, "")), str(r.get(source_col, "")))
+        return apply_trim_rule(mr, str(r.get(source_col, ""))) if trim_rules else mr
+    new_model_red = df.apply(_rewrite, axis=1)
 
     # Update model_trim alignment when the old model_red was used as the trim
     if model_trim_col and model_trim_col in df.columns:

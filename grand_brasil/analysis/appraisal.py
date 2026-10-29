@@ -524,6 +524,17 @@ def _select_comparables(
         year_model=request.year_model,
         year_tolerance=year_tolerance,
     )
+    tokens = request.model_red.strip().upper().split()
+    while len(df) < min_comparables and len(tokens) > 2:
+        tokens = tokens[:-1]
+        family = " ".join(tokens)
+        df = find_comparables(
+            sales_df=sales_df, model_key=family, match_column="model_red",
+            year_model=request.year_model, year_tolerance=year_tolerance, prefix=True,
+        )
+        if len(df) >= min_comparables:
+            logger.info(f"{request.model_red}: {len(df)} comparables at family level {family}")
+            return df, False, family
     return df, False, request.model_red
 
 

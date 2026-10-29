@@ -29,8 +29,11 @@ def find_comparables(
     match_column: str = "model_red",
     year_model: int = 0,
     year_tolerance: int = 2,
+    prefix: bool = False,
 ) -> pd.DataFrame:
     """Filter sales history to rows matching a model key within a year window.
+
+    prefix=True also accepts keys that extend `model_key` (every trim of a family).
 
     Args:
         sales_df: Sales history DataFrame.
@@ -48,8 +51,10 @@ def find_comparables(
     if match_column not in sales_df.columns:
         match_column = "model_red"
 
+    col = sales_df[match_column].astype(str)
+    key_match = (col == key_upper) | col.str.startswith(key_upper + " ") if prefix else (col == key_upper)
     mask = (
-        (sales_df[match_column] == key_upper)
+        key_match
         & (sales_df["year_model"] >= year_model - year_tolerance)
         & (sales_df["year_model"] <= year_model + year_tolerance)
     )

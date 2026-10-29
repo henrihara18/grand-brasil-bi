@@ -303,14 +303,18 @@ def _resolve_model_key(requested_key: str, appraisal_df: pd.DataFrame) -> tuple[
     """
     tokens = requested_key.split()
     key = requested_key
+    exact = True
     while True:
-        candidates = appraisal_df[appraisal_df["model_red"] == key]
+        col = appraisal_df["model_red"]
+        mask = (col == key) if exact else ((col == key) | col.str.startswith(key + " "))
+        candidates = appraisal_df[mask]
         if not candidates.empty:
             return key, candidates.copy()
         if len(tokens) <= 2:
             return requested_key, appraisal_df.iloc[0:0].copy()
         tokens = tokens[:-1]
         key = " ".join(tokens)
+        exact = False   # family level: every trim of the family counts
 
 
 @dataclass(frozen=True)

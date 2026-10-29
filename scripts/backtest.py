@@ -87,11 +87,13 @@ def main() -> None:
                "AVALIADO": cfg.buy_ratio.avaliado_weight}
 
     t0 = time.time()
-    sales = load_sales_history(ROOT / (args.sales or cfg.sales_history_file))
-    appr = load_appraisal_history(ROOT / args.appraisals, status_weights=weights)
+    trims = cfg.trim_rules_enabled
+    sales = load_sales_history(ROOT / (args.sales or cfg.sales_history_file), trim_rules=trims)
+    appr = load_appraisal_history(ROOT / args.appraisals, status_weights=weights, trim_rules=trims)
     legacy = ROOT / cfg.appraisal_legacy_file
     if legacy.exists():
-        appr = merge_with_legacy(appr, load_appraisal_history(legacy, status_weights=weights), cfg.appraisal_legacy_until)
+        appr = merge_with_legacy(appr, load_appraisal_history(legacy, status_weights=weights, trim_rules=trims), cfg.appraisal_legacy_until)
+    print(f"  regras de acabamento: {'ligadas' if trims else 'desligadas'}")
     if cfg.reconcile_paid_with_sales:
         appr = reconcile_with_sales(appr, sales, cfg.reconcile_tolerance)
         print(f"  reconciliacao com custo da venda: {int((appr['paid_source'] == 'venda').sum())} valores corrigidos")

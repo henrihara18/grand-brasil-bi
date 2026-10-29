@@ -236,6 +236,7 @@ class AppraisalConfig(BaseModel):
     # Appraisal base hygiene: replace 'valor avaliado' by the sale's adjusted cost when the
     # plate matches a later sale and they differ by more than the tolerance; drop closed
     # deals whose ratio is below the empirical floor for the car's age (P1 of closed deals).
+    trim_rules_enabled: bool = True              # trim in model_red for families where it moves price (utils/model_generation.TRIM_RULES)
     reconcile_paid_with_sales: bool = False
     reconcile_tolerance: float = 0.05
     ratio_floor_by_age: dict[int, float] = {}      # {max_age: floor}, e.g. {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40}

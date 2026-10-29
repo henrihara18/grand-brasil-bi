@@ -134,7 +134,7 @@ def load_sales_data(config: Settings) -> Optional[pd.DataFrame]:
 
     try:
         with st.spinner("Carregando historico de vendas..."):
-            df = load_sales_history(file_path)
+            df = load_sales_history(file_path, trim_rules=config.app.appraisal.trim_rules_enabled)
             st.session_state["sales_history_df"] = df
             return df
     except Exception as e:

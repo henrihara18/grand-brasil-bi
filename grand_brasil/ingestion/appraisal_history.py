@@ -109,6 +109,7 @@ def load_appraisal_history(
     utilizado_only: bool = False,
     include_avaliado: bool = True,
     status_weights: Optional[dict[str, float]] = None,
+    trim_rules: bool = True,
 ) -> pd.DataFrame:
     """Load the historical appraisal Excel into a cleaned DataFrame.
 
@@ -215,7 +216,8 @@ def load_appraisal_history(
     if "version" in df.columns:
         apply_generation_split_df(df, source_col="version",
                                   model_red_col="model_red",
-                                  model_trim_col=None)  # no trim on appraisal side
+                                  model_trim_col=None,
+                                  trim_rules=trim_rules)
 
     return df.reset_index(drop=True)
 

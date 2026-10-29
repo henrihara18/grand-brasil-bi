@@ -50,6 +50,7 @@ REQUIRED_COLUMNS = [
 def load_sales_history(
     source: Union[str, Path, "UploadedFile"],
     header_row: int = 1,
+    trim_rules: bool = True,
 ) -> pd.DataFrame:
     """Load a processed sales history file into a clean DataFrame.
 
@@ -130,7 +131,8 @@ def load_sales_history(
     if "modelo_full" in df.columns:
         apply_generation_split_df(df, source_col="modelo_full",
                                   model_red_col="model_red",
-                                  model_trim_col="model_trim")
+                                  model_trim_col="model_trim",
+                                  trim_rules=trim_rules)
 
     logger.info(f"Sales history cleaned: {len(df)} valid rows")
     return df
