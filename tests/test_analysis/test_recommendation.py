@@ -58,3 +58,38 @@ def test_nothing_available_leaves_none():
     s = _sug()
     _apply_recommendation(s, AppraisalConfig(headline_mode="ensemble"))
     assert s.recommended_value is None and s.recommended_source is None
+
+
+# ── Alert: headline above X % of FIPE (forensic item 9) ──────────────────────
+
+from grand_brasil.analysis.appraisal import _apply_fipe_ratio_alert
+from grand_brasil.models.appraisal import AppraisalRequest
+
+
+def _req(fipe="100000"):
+    return AppraisalRequest(brand="HYUNDAI", model_red="HYUNDAI HB20S", year_model=2026, km=10, fipe_price=Decimal(fipe))
+
+
+def test_alert_fires_above_threshold():
+    s = _sug(a="97000", b="97000")
+    _apply_recommendation(s, AppraisalConfig(headline_mode="ensemble"))
+    _apply_fipe_ratio_alert(s, _req(), AppraisalConfig(fipe_ratio_alert=0.95))
+    assert s.recommended_fipe_ratio == 0.97
+    assert s.above_fipe_alert and "97%" in s.above_fipe_alert and "margem negativa" in s.above_fipe_alert
+
+
+def test_no_alert_at_or_below_threshold():
+    s = _sug(a="95000", b="95000")
+    _apply_recommendation(s, AppraisalConfig(headline_mode="ensemble"))
+    _apply_fipe_ratio_alert(s, _req(), AppraisalConfig(fipe_ratio_alert=0.95))
+    assert s.recommended_fipe_ratio == 0.95 and s.above_fipe_alert is None
+
+
+def test_alert_switch_off_and_missing_inputs():
+    s = _sug(a="99000", b="99000")
+    _apply_recommendation(s, AppraisalConfig(headline_mode="ensemble"))
+    _apply_fipe_ratio_alert(s, _req(), AppraisalConfig(fipe_ratio_alert=None))
+    assert s.recommended_fipe_ratio == 0.99 and s.above_fipe_alert is None
+    s2 = _sug()
+    _apply_fipe_ratio_alert(s2, _req(), AppraisalConfig())
+    assert s2.recommended_fipe_ratio is None and s2.above_fipe_alert is None

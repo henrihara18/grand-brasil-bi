@@ -106,6 +106,8 @@ def _render_blended_headline(result) -> None:
             st.caption(f"ℹ️ {result.recommended_reason}")
         if result.blended_reason:
             st.caption(f"ℹ️ Finalidade: **{purpose_label}** — {result.blended_reason}")
+        if result.above_fipe_alert:
+            st.warning(result.above_fipe_alert)
 
     with alt_col:
         if use_buy_ratio:

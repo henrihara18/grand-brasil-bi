@@ -603,9 +603,36 @@ marcas o algoritmo fica a ±5 % da mesa em 61 % e a ±10 % em 84 % dos casos; em
 | 4 | **KM muito fora da faixa dos comparáveis** — inclinação linear extrapolada de 60k para 300k | HB20 2022 c/ 309 mil km: mesa 27k, algoritmo 38,5k; Elantra 227 mil km: 42k vs 57,5k | 6 % dos casos (KM > 150k), MAPE 8,7 % | inclinação por faixa implementada (`km_adjust_mode: piecewise`) — **neutra no backtest, fica desligada**; o que resolve é o **sinal "KM fora da faixa"** na confiança (perfil próprio → cai para baixa) |
 | 5 | **Finalidade REPASSE** — a mesa paga atacado, os comparáveis misturam showroom | 31 % das avaliações; algoritmo +2,8 % acima da mesa nelas | REPASSE→Revenda MAPE 8,7 % | comparáveis por finalidade implementados (`purpose_aware`) — viés da Revenda cai de +1,5 % para +1,0 %, mas Loja piora 0,1 pp e o total não melhora: **fica desligado** |
 | 6 | **Versão dentro da família** | Song Pro 2025 GS: mesa 190k, vendido 216k, algoritmo 140k | — | **testado, sem ganho.** Varredura: em BYD o acabamento não separa preço com volume (Song Pro 39 GS × 9 GL; Song Plus Premium = 1 venda) — o caso era FIPE de versão errada. Onde separa (HB20 Platinum +22 % / Sense −17 %, HR-V Touring +14 % / EXL −8 %, Onix, Kicks, T-Cross/Nivus Highline, Compass Sport −11 %, Corolla Altis Híbrido) as regras foram implementadas (`utils/model_generation.TRIM_RULES`, nas duas bases) e medidas: geral 6,5 % → 6,5 %, ±10 % 80 → 79 %; por família igual ou pior (Compass Longitude 9,3 % vs 6,9 %). O ratio já normaliza pela FIPE, que é por versão — separar só encolhe a amostra. Fica desligado (`trim_rules_enabled: false`). O fallback para a família passou a ser por prefixo (todos os acabamentos), neutro e mantido. |
-| 7 | **FIPE descolada do mercado** (ano seguinte inflada; BYD caindo) | Song Pro 2027: FIPE 237k, mesa 160k, vendido 167k; Song Plus 2024: FIPE 167k, atacado 125k | BYD, 0 km | **pendente** (cheque FIPE × vendas recentes do modelo-ano; pesar mais a âncora B) |
+| 7 | **FIPE descolada do mercado** (ano seguinte inflada; BYD caindo) | Song Pro 2027: FIPE 237k, mesa 160k, vendido 167k; Song Plus 2024: FIPE 167k, atacado 125k | BYD, 0 km | **investigado, não é buraco do algoritmo** (detalhe abaixo). A FIPE de 237.224 do Song Pro 2027 é, ao centavo, a FIPE do **Song Plus** 2027 naquele mês: erro de entrada na plataforma de avaliação. O Song Plus 2024 vende em loja a 93–98 % da FIPE; os 125k são desconto de Revenda, não FIPE errada. |
 | 8 | **Ofertas não fechadas dominando modelo raro** (<3 fechadas) | Etios 2017: 1 fechada + 8 ofertas → 53,5k vs mesa 40k | <5 fechadas: MAPE 6,2 % vs 4,0 % com 5–9 | já cai em confiança baixa; regra de "sugestão, não preço" |
-| 9 | **Não é buraco: a mesa pagou acima da FIPE** (0 km, troca na venda de novo) | HB20S 0 km a 114 % da FIPE, margem −1,1 %; Dolphin 2027 a 106 %, −3,5 % | 27 casos >95 % da FIPE, metade com margem negativa | alerta na tela "mesa acima da FIPE" (pendente) |
+| 9 | **Não é buraco: a mesa pagou acima da FIPE** (0 km, troca na venda de novo) | HB20S 0 km a 114 % da FIPE, margem −1,1 %; Dolphin 2027 a 106 %, −3,5 % | 78 casos >95 % da FIPE em 2026 (27 nas três marcas), um terço com margem negativa (metade nas três marcas) | **feito**: alerta na tela quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`); dispara em 0,6 % das avaliações da régua, onde a margem se pagasse o recomendado é negativa em 42 % |
+
+**Item 7 em detalhe — a hipótese "FIPE descolada" não se sustenta nos dados.** Testadas três
+leituras, todas na régua de 2.138 casos:
+
+- *Spread das vendas recentes vs FIPE* (o que a âncora B já usa): nos 68 casos em que o modelo
+  vende >10 % abaixo da FIPE, a âncora A erra 5–11 % **sem viés**, e a B erra 13–17 % pagando
+  **de menos** (−12 a −17 %). O peso ótimo de A nesses casos é 0,8–0,9, não menor: quando a FIPE
+  está alta, a mesa também pagou menos, e o ratio pago/FIPE já carrega isso. Pesar mais a B
+  pioraria.
+- *FIPE informada vs FIPE recente do mesmo modelo-ano na nossa base* (cheque de plausibilidade):
+  13,5 % dos casos têm FIPE >10 % fora da mediana da família — e são **versões legítimas** (HB20
+  Premium 1.6 a +30 %, Platinum +29 %, Renegade Trailhawk +29 %, Jetta GLI +33 %, C3 Shine +48 %).
+  O erro desses casos é 6,9 % contra 6,5 % no resto; "corrigir" a FIPE pela família levaria o
+  MAPE geral de 6,5 % para 8,1 %. O único caso de FIPE realmente errada (Song Pro 2027) nem entra
+  no cheque, porque o ano-modelo novo ainda não tinha base. Em produção a FIPE vem da API para a
+  versão escolhida no formulário, então o erro da plataforma não se reproduz da mesma forma.
+- *Ano seguinte / 0 km* (8 e 11 casos): A paga +9,8 % e +5,9 % acima do ideal, B +4,9 % e +1,3 %.
+  Direção consistente com a forense, mas 8 casos (um deles o Song Pro com FIPE errada, a +41 %)
+  não sustentam uma regra de peso por idade; fica anotado para rever quando houver 30+ casos.
+
+**Viés por idade (achado colateral, medido e não adotado).** A mesa — e o algoritmo, que aprende
+com ela — paga acima do ideal nos carros novos (ano-modelo igual ao da avaliação: +3,7 %; 1–2
+anos: +2,1 %) e abaixo nos velhos (8 anos: −3,5 %; 10+: −5,4 %). Uma correção de viés por faixa
+de idade aprendida só com vendas já fechadas antes de cada mês (walk-forward) dá MAPE 6,50 % →
+6,42 % e ±5 % 54 → 55 %, mas introduz viés de +1,0 % e faz a Revenda pagar +3,2 % acima do ideal
+(era +1,4 %). Ganho menor que o ruído, com efeito colateral no canal que já paga caro: **não
+adotado**. Pagar 3 % a menos que a mesa em carro novo é decisão de negócio, não estatística.
 
 **Resultado das correções 1–3 na régua:** neutras no erro médio (6,4 % → 6,4 % nos mesmos
 casos) — o que mudou foi a **cauda**: os casos pontuais acima deixam de acontecer e a base de
@@ -635,10 +662,12 @@ com o sinal "KM fora da faixa": **alta cobre 34 % com 90 % dentro de ±10 %** (e
 | dashboard | `pages/avaliacao.py`, `pages/_avaliacao/{loaders,result}.py` | passa slope/perfil/confiança ao motor; mostra fonte do valor e a confiança calibrada |
 | backtest | `grand_brasil/backtest/`, `scripts/backtest.py`, `scripts/confidence_curve.py`, `scripts/ml_stacking.py` | split temporal, alvo por margem realizada, métricas e cortes, calibração, comparativo ML |
 | limpeza | vários | removidos `km_pct_per_10k`, `FATOR_ANO`, `blindado_premiums` (config morto), aliases de compatibilidade; docstrings corrigidas |
+| alerta | `analysis/appraisal.py` (`_apply_fipe_ratio_alert`), `result.py` | aviso quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`) |
 | config | `config.yaml` | pilha final ligada, com os valores antigos anotados para reproduzir a régua |
 
-Testes: **414** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
-shrinkage, perfil por marca, ensemble, toggles da âncora B, confiança, integração e backtest.
+Testes: **444** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
+shrinkage, perfil por marca, ensemble, toggles da âncora B, confiança, integração, backtest,
+higiene da base, acabamentos e alerta de FIPE.
 
 ### 5.2 Como reproduzir
 
@@ -667,6 +696,8 @@ e 2026.xlsx` (legado). Recalibrar a confiança a cada novo mês de vendas (os do
   deixar para quando a base de vendas crescer.
 - **Janela temporal na margem dinâmica** (S3) — afeta só a âncora B (30 % do destaque);
   sem efeito mensurável no backtest.
+- **Correção de viés por idade** e **peso da âncora B por idade** — medidos na forense (4.7, item
+  7): ganho dentro do ruído e efeito colateral na Revenda; 8 casos de ano seguinte não bastam.
 - **Webmotors** como referência — sem chave de API ativa; nada para testar.
 - **Cor, opcionais, estado, procedência** como entradas — não existem nas bases; é o próximo
   degrau de precisão, mas depende de capturar esses campos na avaliação.

@@ -79,6 +79,10 @@ appraisal:
   # ±10% 76% -> 80%. "buy_ratio_first" reproduz o comportamento antigo.
   headline_mode: ensemble
   ensemble_weight_buy_ratio: 0.7
+  # Alerta na tela quando o valor recomendado passa desta fracao da FIPE: dos 78 fechamentos
+  # de 2026 acima de 95% da FIPE (0 km / ano seguinte, troca na venda de novo) um terco saiu
+  # com margem negativa. null desliga.
+  fipe_ratio_alert: 0.95
   margin_basis: markup          # "sale" (margem sobre a venda, com imposto) testado: mais conservador sem ganhar
   sales_tax_pct: 0.0
   confidence_calibration_file: "data/confidence_calibration.json"

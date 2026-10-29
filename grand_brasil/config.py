@@ -232,6 +232,10 @@ class AppraisalConfig(BaseModel):
     headline_mode: str = "buy_ratio_first"
     ensemble_weight_buy_ratio: float = 0.7
     ensemble_weight_by_tier: dict[str, float] = {}   # optional per-tier override of the weight
+    # Alert when the headline sits above this share of FIPE (None = off). In 2026, a third of
+    # the 78 closed deals above 95 % of FIPE (0 km / next model year, trade-in on a new-car
+    # sale) ended with a negative margin.
+    fipe_ratio_alert: Optional[float] = 0.95
 
     # Appraisal base hygiene: replace 'valor avaliado' by the sale's adjusted cost when the
     # plate matches a later sale and they differ by more than the tolerance; drop closed

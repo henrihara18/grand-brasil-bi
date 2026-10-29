@@ -295,6 +295,7 @@ def appraise(
 
     # ── 11b) Headline: which number the UI shows ──
     _apply_recommendation(suggestion, appraisal_config)
+    _apply_fipe_ratio_alert(suggestion, request, appraisal_config)
 
     # ── 12) Confidence + rationale ──
     suggestion.confidence = _assess_confidence(
@@ -488,6 +489,30 @@ def _apply_recommendation(suggestion: AppraisalSuggestion, appraisal_config) -> 
         suggestion.recommended_value = b
         suggestion.recommended_source = "blend"
         suggestion.recommended_reason = suggestion.blended_reason or "Sem histórico de compra — análise de vendas."
+
+
+def _apply_fipe_ratio_alert(suggestion: AppraisalSuggestion, request: AppraisalRequest, appraisal_config) -> None:
+    """Flag a headline that sits above `fipe_ratio_alert` × FIPE.
+
+    Not an algorithm hole: the desk closes these deals (0 km or next model year
+    taken as trade-in on a new-car sale), but in 2026 a third of the 78 closed
+    deals above 95 % of FIPE ended with a negative margin (half in Hyundai/Toyota/BYD). The number stays; the
+    screen warns.
+    """
+    fipe = request.fipe_price
+    value = suggestion.recommended_value
+    if fipe is None or fipe <= 0 or value is None or value <= 0:
+        return
+    ratio = float(value) / float(fipe)
+    suggestion.recommended_fipe_ratio = ratio
+    threshold = getattr(appraisal_config, "fipe_ratio_alert", None) if appraisal_config else None
+    if threshold is None or ratio <= float(threshold):
+        return
+    suggestion.above_fipe_alert = (
+        f"⚠️ Valor recomendado a {ratio:.0%} da FIPE (acima de {float(threshold):.0%}). "
+        f"Nos fechamentos de 2026 nessa faixa — 0 km ou ano seguinte, em geral troca na venda de um "
+        f"novo — um terço saiu com margem negativa. Confira a margem da venda antes de fechar."
+    )
 
 
 # ── Orchestration helpers ────────────────────────────────────────────────────

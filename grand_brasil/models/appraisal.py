@@ -185,6 +185,8 @@ class AppraisalSuggestion(BaseModel):
     recommended_value: Optional[Decimal] = None
     recommended_source: Optional[str] = None            # "buy_ratio" | "blend" | "ensemble"
     recommended_reason: Optional[str] = None            # PT-BR explanation
+    recommended_fipe_ratio: Optional[float] = None      # recommended_value / fipe_price
+    above_fipe_alert: Optional[str] = None              # PT-BR warning when the ratio is above config.fipe_ratio_alert
     blended_max_trade_value: Optional[Decimal] = None   # single recommended price
     blended_weight_loja: Optional[float] = None         # weight applied to Loja
     blended_weight_revenda: Optional[float] = None      # weight applied to Revenda
