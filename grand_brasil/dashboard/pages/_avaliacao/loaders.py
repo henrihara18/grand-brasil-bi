@@ -112,7 +112,7 @@ def load_sales_data(config: Settings) -> Optional[pd.DataFrame]:
     if url:
         try:
             with st.spinner("Carregando historico de vendas..."):
-                df = _load_sales_from_gdrive(url)
+                df = _load_sales_from_gdrive(url, trim_rules=config.app.appraisal.trim_rules_enabled)
                 st.session_state["sales_history_df"] = df
                 return df
         except Exception as e:
@@ -143,10 +143,10 @@ def load_sales_data(config: Settings) -> Optional[pd.DataFrame]:
         return None
 
 
-def _load_sales_from_gdrive(url: str) -> pd.DataFrame:
+def _load_sales_from_gdrive(url: str, trim_rules: bool = False) -> pd.DataFrame:
     tmp_path = _download_gsheet_xlsx(url)
     try:
-        return load_sales_history(Path(tmp_path))
+        return load_sales_history(Path(tmp_path), trim_rules=trim_rules)
     finally:
         os.unlink(tmp_path)
 
@@ -159,10 +159,11 @@ def load_appraisal_data(
 ) -> Optional[pd.DataFrame]:
     """Load the historical appraisal database with session cache.
 
-    Primary source is APPRAISAL_HISTORY_URL (Google Sheets, V2 layout). When
-    the legacy Excel configured in `appraisal_legacy_file` exists locally, its
-    rows dated before `appraisal_legacy_until` are appended (the V2 export only
-    covers 2026 onwards). Without the URL, the legacy file alone is used.
+    Primary source is APPRAISAL_HISTORY_URL (Google Sheets, V2 layout). The
+    legacy base (rows dated before `appraisal_legacy_until`; the V2 export only
+    covers 2026 onwards) comes from the local Excel `appraisal_legacy_file` when
+    it exists, else from APPRAISAL_LEGACY_URL (Google Sheets) — the cloud app has
+    no local files. Without the primary URL, the legacy base alone is used.
     """
     if "appraisal_df" in st.session_state:
         return st.session_state["appraisal_df"]
@@ -184,22 +185,30 @@ def load_appraisal_data(
     }
 
     url = _get_secret("APPRAISAL_HISTORY_URL")
+    legacy_url = _get_secret("APPRAISAL_LEGACY_URL")
     df: Optional[pd.DataFrame] = None
+
+    def _load_legacy() -> Optional[pd.DataFrame]:
+        if legacy_path is not None:
+            return load_appraisal_history(legacy_path, **load_kw)
+        if legacy_url:
+            return _load_appraisals_from_gdrive(legacy_url, **load_kw)
+        return None
 
     if url:
         try:
             with st.spinner("Carregando base de avaliacoes historicas..."):
                 df = _load_appraisals_from_gdrive(url, **load_kw)
-                if legacy_path is not None:
-                    legacy_df = load_appraisal_history(legacy_path, **load_kw)
+                legacy_df = _load_legacy()
+                if legacy_df is not None:
                     df = merge_with_legacy(df, legacy_df, legacy_until)
         except Exception as e:
             logger.exception("Failed to load appraisal base from Google Drive")
             st.warning(f"Nao foi possivel carregar base de avaliacoes: {e}")
-    elif legacy_path is not None:
+    elif legacy_path is not None or legacy_url:
         try:
             with st.spinner("Carregando base de avaliacoes historicas..."):
-                df = load_appraisal_history(legacy_path, **load_kw)
+                df = _load_legacy()
         except Exception as e:
             logger.exception("Failed to load appraisal base")
             st.warning(f"Nao foi possivel carregar base de avaliacoes: {e}")

@@ -68,3 +68,6 @@ htmlcov/
 
 # Saidas do backtest (os numeros relevantes estao em REVISAO_PRECIFICACAO.md)
 backtest_results/
+
+# Arquivos preparados para subir no Google Drive / Streamlit Cloud (dados de clientes)
+nuvem/

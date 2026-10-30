@@ -30,6 +30,8 @@ Two main flows:
 - **Appraisal history** — Google Sheets published link via `APPRAISAL_HISTORY_URL`
   (appraisal-platform export, 2026+; layout auto-detected) merged with the legacy
   Excel `Avaliações 2025 e 2026.xlsx` for rows before `appraisal_legacy_until`
+  (cloud has no local files: the legacy base comes from `APPRAISAL_LEGACY_URL` and sales
+  from `SALES_HISTORY_URL`; the sheets are trimmed copies without customer PII)
 - **FIPE API** — live catalog and prices, via `FipeClient`
 - **WebMotors** — optional reference prices via ScraperAPI proxy (currently standby)
 
