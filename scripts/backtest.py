@@ -49,6 +49,8 @@ def main() -> None:
                     help="from_case = Revenda quando a avaliacao foi lancada como REPASSE (o que o avaliador escolheria na tela)")
     ap.add_argument("--keep-same-plate", action="store_true", help="nao excluir avaliacoes anteriores do mesmo carro")
     ap.add_argument("--limit", type=int, default=None, help="rodar so os N primeiros casos (debug)")
+    ap.add_argument("--no-confidence-calibration", action="store_true",
+                    help="usar a confianca por contagem (sem data/confidence_calibration.json) — a calibrada e ajustada com os proprios casos de 2026")
     ap.add_argument("--out", default="backtest_results")
     ap.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
                     help="override de config, ex.: --set buy_ratio.tier_order=km_first --set buy_ratio.km_adjust=true")
@@ -114,8 +116,14 @@ def main() -> None:
     fipe = TableFipeClient(FipeTable(appr))
     print(f"tabela FIPE: {fipe.table.size} combinacoes modelo x ano x mes")
 
+    conf_model = None
+    conf_path = ROOT / cfg.confidence_calibration_file
+    if not args.no_confidence_calibration and conf_path.exists():
+        from grand_brasil.analysis.confidence import ConfidenceModel
+        conf_model = ConfidenceModel.from_json(conf_path)
+        print(f"confianca calibrada: {conf_path.name} (ajustada com os casos de 2026 — portao e niveis sao in-sample neste ano)")
     t1 = time.time()
-    res = run_backtest(cases, sales, appr, cfg, fipe, RunOptions(purpose=args.purpose, exclude_same_plate=not args.keep_same_plate))
+    res = run_backtest(cases, sales, appr, cfg, fipe, RunOptions(purpose=args.purpose, exclude_same_plate=not args.keep_same_plate, confidence_model=conf_model))
     res = add_errors(res)
     print(f"motor rodou {len(res)} casos em {time.time() - t1:.0f}s | FIPE hist: {fipe.hits} hits, {fipe.misses} misses")
 

@@ -105,6 +105,12 @@ The `appraise()` function produces TWO independent anchors:
    deals), from `data/confidence_calibration.json`. Levels: alta (q90 ≤ 10%), média (≤ 15%),
    baixa. Falls back to the comparable count when the file is missing.
 
+5. **Official-price gate** (`config.yaml → appraisal.official_gate`, `_apply_official_gate`):
+   `price_mode` = `oficial` only when the calibrated confidence is alta/média and the car is
+   within age/KM limits, not 0 km / next model year, not an excluded brand/model, not blindado.
+   Otherwise the headline is shown as a suggestion with the reasons (`price_mode_reasons`).
+   Thresholds were measured on the backtest (REVISAO 4.8); change them in config, not in code.
+
 Backtest (temporal, reproducible): `py -3.12 scripts/backtest.py --label <name>`; confidence
 calibration: `scripts/confidence_curve.py --predictions ... --out data/confidence_calibration.json`.
 Full review, metrics before/after and decisions: `REVISAO_PRECIFICACAO.md`.

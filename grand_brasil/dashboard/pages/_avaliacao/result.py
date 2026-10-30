@@ -29,6 +29,7 @@ def render_result(result) -> None:
     st.subheader(f"Resultado: {display_name} {result.year_model}")
 
     _render_blended_headline(result)
+    _render_price_mode(result)
 
     if result.buy_ratio_available:
         _render_primary_buy_ratio(result)
@@ -92,6 +93,9 @@ def _render_blended_headline(result) -> None:
         "buy_ratio": "💰 Valor Recomendado (histórico de compra)",
     }.get(source, "💰 Valor Recomendado (histórico de compra)" if use_buy_ratio else "💰 Valor Recomendado de Compra")
 
+    if result.price_mode == "sugestao":
+        headline_label = "💡 Sugestão de Valor — não é preço oficial"
+
     main_col, alt_col = st.columns([3, 2])
     with main_col:
         st.metric(
@@ -134,6 +138,21 @@ def _render_blended_headline(result) -> None:
                 )
 
     st.divider()
+
+
+def _render_price_mode(result) -> None:
+    """Official price (inside the gate) or suggestion for the desk (outside), with the reasons."""
+    if result.price_mode == "oficial":
+        st.success(
+            "✅ **Preço oficial** — perfil dentro do portão: confiança alta ou média, idade e KM dentro "
+            "dos limites, marca com base. Na régua de 2026, 87% desses casos ficam a ±10% do ideal."
+        )
+    elif result.price_mode == "sugestao":
+        reasons = "; ".join(result.price_mode_reasons) or "fora do portão"
+        st.warning(
+            f"💡 **Sugestão, não é preço oficial.** Motivo: {reasons}. "
+            "Use como referência e feche o valor com a mesa."
+        )
 
 
 def _render_primary_buy_ratio(result) -> None:

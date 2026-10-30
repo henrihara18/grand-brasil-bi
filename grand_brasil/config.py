@@ -209,6 +209,25 @@ class KMCurveConfig(BaseModel):
     ]
 
 
+class OfficialGateConfig(BaseModel):
+    """When is the headline an *official price* vs. a *suggestion* to be closed by the desk.
+
+    Thresholds measured on the 2026 backtest (REVISAO_PRECIFICACAO.md 4.8): the calibrated
+    confidence does most of the work; age, KM, 0 km / next model year and thin brands trim
+    the tail. Every list is upper-case brand / model_red prefix.
+    """
+    enabled: bool = True
+    allowed_confidence: list[str] = ["alta", "media"]   # calibrated levels that may be an official price
+    max_age_years: Optional[int] = 10              # reference year - year_model
+    max_km: Optional[int] = 150_000
+    exclude_new: bool = True                       # 0 km (below new_km_threshold) or next model year
+    new_km_threshold: int = 1_000
+    exclude_brands: list[str] = ["AUDI", "BMW", "LAND ROVER"]
+    exclude_models: list[str] = []                 # model_red prefixes, e.g. "BMW X6"
+    exclude_blindado: bool = True
+    min_closed_deals: int = 0                      # closed deals behind the buy-ratio
+
+
 class AppraisalConfig(BaseModel):
     """Configuration for the trade-in appraisal engine."""
 
@@ -256,6 +275,7 @@ class AppraisalConfig(BaseModel):
     km_curve: KMCurveConfig = KMCurveConfig()
     brand_tier: BrandTierConfig = BrandTierConfig()
     channel_probability: ChannelProbabilityConfig = ChannelProbabilityConfig()
+    official_gate: OfficialGateConfig = OfficialGateConfig()
 
 
 class AppConfig(BaseModel):

@@ -45,6 +45,24 @@ appraisal:
   # Filtro de blindados nos comparaveis (cerca de preco por faixa de ano):
   # thresholds em analysis/_blindado.py (_blindado_filter_premium); 2019 ou mais antigo nao filtra.
 
+  # ── Portao "preco oficial x sugestao" (30/10/2026, secao 4.8 da revisao) ──────
+  # Dentro do portao o valor e preco oficial; fora, e sugestao para a mesa fechar.
+  # Regua 2026 (confianca calibrada walk-forward): dentro 44% das avaliacoes, MAPE 5,1%,
+  # 87% a ±10%, erro >15% em 5%; fora, MAPE 7,7%, 74% a ±10%, erro >15% em 13%.
+  # A confianca calibrada faz o grosso do corte; idade, KM, 0 km/ano seguinte e marcas
+  # sem base aparam a cauda.
+  official_gate:
+    enabled: true
+    allowed_confidence: [alta, media] # so "alta": 24% das avaliacoes com a mesma qualidade (4,9% / 87%)
+    max_age_years: 10                 # 11+ anos: MAPE 9-11%, vies -7 a -9%
+    max_km: 150000                    # >200 mil km: MAPE 14,5%
+    exclude_new: true                 # 0 km / ano seguinte: algoritmo paga +6 a +10% acima do ideal
+    new_km_threshold: 1000
+    exclude_brands: [AUDI, BMW, LAND ROVER]   # dentro do portao BMW da MAPE 9,6% e 57% a ±10%; Audi/LR sem base
+    exclude_models: []                # prefixos de model_red, ex. "BMW X6"
+    exclude_blindado: true
+    min_closed_deals: 0               # testado 3 e 5: nao melhora o dentro, so encolhe (32% / 17%)
+
   # ── Ancora primaria: buy-ratio (base historica de avaliacoes) ─────────────
   buy_ratio:
     # Pesos por status para mediana ponderada:

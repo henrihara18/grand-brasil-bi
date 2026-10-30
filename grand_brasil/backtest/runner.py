@@ -47,6 +47,7 @@ def ui_headline(s: AppraisalSuggestion) -> Optional[float]:
 @dataclass
 class RunOptions:
     purpose: str = "auto"
+    confidence_model: object = None     # ConfidenceModel; None = count-based confidence
     exclude_same_plate: bool = True
     headline: Headline = ui_headline
     progress_every: int = 500
@@ -115,6 +116,7 @@ def run_backtest(
                     reference_date=cutoff,
                     km_slope=km_slope,
                     brand_year_profile=brand_profile,
+                    confidence_model=opts.confidence_model,
                 )
             except Exception as e:  # keep the run alive; count failures
                 logger.warning(f"appraise failed for case {c.get('plate_norm')}: {e}")
@@ -148,6 +150,8 @@ def run_backtest(
                 "revenda_margin_target": s.revenda_target_margin_percent,
                 "p_revenda": s.p_revenda,
                 "confidence": s.confidence,
+                "price_mode": s.price_mode or "n/d",
+                "price_mode_reasons": "; ".join(s.price_mode_reasons),
                 "total_comparables": s.total_comparables,
                 "loja_comparables": s.loja_comparables_count,
                 "revenda_comparables": s.revenda_comparables_count,

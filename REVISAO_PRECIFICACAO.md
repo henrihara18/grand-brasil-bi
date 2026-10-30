@@ -646,6 +646,48 @@ e mantém todos os casos na régua.
 com o sinal "KM fora da faixa": **alta cobre 34 % com 90 % dentro de ±10 %** (era 30 %); os perfis
 "KM fora" têm q90 de 19–24 % e caem em baixa (114 casos em 2026).
 
+### 4.8 Portão "preço oficial × sugestão" (30/10/2026)
+
+Pedido do Henri: carro difícil (ano, KM, algumas marcas/modelos) recebe sugestão, não preço
+oficial. Em vez de escolher os cortes de cabeça, cada regra foi medida na régua de 2.138 casos,
+com a **confiança calibrada walk-forward** (a mesma que a tela usa, ajustada a cada mês só com
+vendas já fechadas). A confiança faz o grosso do corte; as regras explícitas aparam a cauda:
+
+| regra candidata | evidência (dentro de confiança alta) |
+|---|---|
+| idade > 10 anos | 11–12 anos: MAPE 9,3 %, viés −7 %; 13+: 10,8 %, −8,7 % (vs 5,0–5,5 % até 8 anos) |
+| KM > 150 mil | 150–200 mil: 7,1 %; > 200 mil: **14,5 %**, viés +11 % (9 casos) |
+| 0 km / ano-modelo seguinte | +5 a +10 % acima do ideal (8–11 casos; a mesa paga acima nesses carros) |
+| marca | BMW dentro do portão: MAPE 9,6 %, ±10 % em 57 %, erro > 15 % em 21 %; Audi 13,8 % e Land Rover 19,8 % no geral, pouca base. BYD 3,0 %, Fiat 3,2 %, Hyundai 4,9 %, VW 4,7 % |
+| mínimo de compras fechadas | **não ajuda**: 0–2 fechadas em alta dá 5,5 %, igual a 3–4; exigir ≥ 3 só encolhe a cobertura para 32 % |
+| blindado | 2 casos, prêmio estimado e não medido — fora por prudência |
+
+**Combinações (confiança calibrada walk-forward, regua 2026):**
+
+| portão | dentro (oficial) | MAPE | ±5 % | ±10 % | erro > 15 % | fora (sugestão): MAPE / ±10 % / > 15 % |
+|---|---|---|---|---|---|---|
+| só alta | 24 % | 5,0 % | 63 % | 87 % | 5,1 % | 7,0 % / 77 % / 10,7 % |
+| alta + regras | 23 % | 4,9 % | 64 % | 87 % | 4,8 % | 7,0 % / 77 % / 10,8 % |
+| alta + média | 48 % | 5,3 % | 60 % | 85 % | 5,6 % | 7,6 % / 75 % / 12,9 % |
+| **alta + média + regras (adotado)** | **44 %** | **5,1 %** | **62 %** | **87 %** | **4,7 %** | 7,7 % / 74 % / 13,2 % |
+| idem, excluindo também Mercedes/Mini/Volvo | 43 % | 4,9 % | 63 % | 88 % | 4,2 % | 7,7 % / 74 % / 13,3 % |
+
+"Alta + média" com as regras dobra a cobertura de "só alta" com a mesma qualidade — a média
+calibrada (q90 ≤ 15 %) já é boa e as regras tiram dela justamente a cauda. Dos 56 % que ficam
+como sugestão, 1.110 são por confiança, 248 por idade, 132 por KM, 50 por marca, 11 por 0 km.
+
+**Implementação:** `config.yaml → appraisal.official_gate` (nível de confiança permitido, idade
+máxima, KM máximo, 0 km/ano seguinte, marcas, prefixos de modelo, blindado, mínimo de fechadas),
+`analysis/appraisal.py::_apply_official_gate` → `price_mode` ("oficial" | "sugestao") e
+`price_mode_reasons`; na tela o título vira "Sugestão de Valor — não é preço oficial" com os
+motivos, e o backtest ganha o corte "modo de preco (portao)". O backtest passou a usar a
+confiança calibrada (`data/confidence_calibration.json`) para que o portão se comporte como em
+produção; como essa tabela é ajustada com os próprios casos de 2026, o corte do resumo é
+in-sample neste ano (`--no-confidence-calibration` volta à contagem). Com ela, o motor marca
+**56 % como preço oficial (MAPE 4,9 %, ±10 % em 88 %)** e 44 % como sugestão (8,4 %, 69 %) — a
+cobertura é maior que os 44 % walk-forward porque a tabela cheia tem perfil para todos os meses.
+Em produção o número real fica entre os dois até a recalibração do mês seguinte.
+
 ---
 
 ## Fase 5 — Entrega
@@ -663,11 +705,12 @@ com o sinal "KM fora da faixa": **alta cobre 34 % com 90 % dentro de ±10 %** (e
 | backtest | `grand_brasil/backtest/`, `scripts/backtest.py`, `scripts/confidence_curve.py`, `scripts/ml_stacking.py` | split temporal, alvo por margem realizada, métricas e cortes, calibração, comparativo ML |
 | limpeza | vários | removidos `km_pct_per_10k`, `FATOR_ANO`, `blindado_premiums` (config morto), aliases de compatibilidade; docstrings corrigidas |
 | alerta | `analysis/appraisal.py` (`_apply_fipe_ratio_alert`), `result.py` | aviso quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`) |
+| portão | `analysis/appraisal.py` (`_apply_official_gate`), `config.OfficialGateConfig`, `result.py`, `backtest/runner.py` | preço oficial × sugestão por confiança calibrada + idade/KM/0 km/marca/modelo (4.8) |
 | config | `config.yaml` | pilha final ligada, com os valores antigos anotados para reproduzir a régua |
 
-Testes: **444** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
+Testes: **458** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
 shrinkage, perfil por marca, ensemble, toggles da âncora B, confiança, integração, backtest,
-higiene da base, acabamentos e alerta de FIPE.
+higiene da base, acabamentos, alerta de FIPE e portão de preço oficial.
 
 ### 5.2 Como reproduzir
 

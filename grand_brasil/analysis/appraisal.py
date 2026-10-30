@@ -308,6 +308,9 @@ def appraise(
         _apply_calibrated_confidence(suggestion, confidence_model)
     suggestion.rationale = build_rationale(suggestion, year_tolerance)
 
+    # ── 13) Official price or suggestion ──
+    _apply_official_gate(suggestion, request, appraisal_config, reference_date)
+
     return suggestion
 
 
@@ -513,6 +516,58 @@ def _apply_fipe_ratio_alert(suggestion: AppraisalSuggestion, request: AppraisalR
         f"Nos fechamentos de 2026 nessa faixa — 0 km ou ano seguinte, em geral troca na venda de um "
         f"novo — um terço saiu com margem negativa. Confira a margem da venda antes de fechar."
     )
+
+
+def _apply_official_gate(
+    suggestion: AppraisalSuggestion,
+    request: AppraisalRequest,
+    appraisal_config,
+    reference_date: Optional[pd.Timestamp] = None,
+) -> None:
+    """Decide whether the headline is an official price or a suggestion for the desk.
+
+    Henri's rule: hard cars (old, high KM, 0 km / next model year, brands without
+    base, low confidence) still get a number, but not an official one. Every
+    threshold lives in config.official_gate and was measured on the backtest.
+    """
+    cfg = getattr(appraisal_config, "official_gate", None) if appraisal_config else None
+    if cfg is None or not cfg.enabled:
+        return
+    if suggestion.recommended_value is None or suggestion.recommended_value <= 0:
+        suggestion.price_mode = "sugestao"
+        suggestion.price_mode_reasons = ["sem valor recomendado"]
+        return
+
+    reasons: list[str] = []
+    allowed = [str(c).lower() for c in (cfg.allowed_confidence or [])]
+    if (suggestion.confidence or "").lower() not in allowed:
+        reasons.append(f"confiança {suggestion.confidence} (preço oficial exige {' ou '.join(allowed)})")
+
+    ref_year = (reference_date if reference_date is not None else pd.Timestamp.today()).year
+    age = ref_year - int(request.year_model)
+    if cfg.max_age_years is not None and age > cfg.max_age_years:
+        reasons.append(f"{age} anos de idade (limite {cfg.max_age_years})")
+    km = request.km
+    if cfg.max_km is not None and km is not None and km > cfg.max_km:
+        reasons.append(f"{km:,} km (limite {cfg.max_km:,})".replace(",", "."))
+    if cfg.exclude_new and (age < 0 or (km is not None and km < cfg.new_km_threshold)):
+        reasons.append("0 km / ano-modelo seguinte (a mesa paga acima do ideal nesses carros)")
+    brand = (request.brand or "").strip().upper()
+    if brand in {b.strip().upper() for b in cfg.exclude_brands}:
+        reasons.append(f"marca {brand} sem base suficiente")
+    model_key = (request.model_red or "").strip().upper()
+    for prefix in cfg.exclude_models:
+        if model_key.startswith(prefix.strip().upper()):
+            reasons.append(f"modelo {prefix.strip().upper()} fora do portão")
+            break
+    if cfg.exclude_blindado and request.blindado:
+        reasons.append("blindado (prêmio estimado, não medido)")
+    closed = suggestion.buy_ratio_closed_deal_count or 0
+    if cfg.min_closed_deals and closed < cfg.min_closed_deals:
+        reasons.append(f"{closed} compras fechadas do modelo (mínimo {cfg.min_closed_deals})")
+
+    suggestion.price_mode = "oficial" if not reasons else "sugestao"
+    suggestion.price_mode_reasons = reasons
 
 
 # ── Orchestration helpers ────────────────────────────────────────────────────
