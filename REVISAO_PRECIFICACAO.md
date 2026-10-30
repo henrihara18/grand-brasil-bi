@@ -606,6 +606,8 @@ marcas o algoritmo fica a ±5 % da mesa em 61 % e a ±10 % em 84 % dos casos; em
 | 7 | **FIPE descolada do mercado** (ano seguinte inflada; BYD caindo) | Song Pro 2027: FIPE 237k, mesa 160k, vendido 167k; Song Plus 2024: FIPE 167k, atacado 125k | BYD, 0 km | **investigado, não é buraco do algoritmo** (detalhe abaixo). A FIPE de 237.224 do Song Pro 2027 é, ao centavo, a FIPE do **Song Plus** 2027 naquele mês: erro de entrada na plataforma de avaliação. O Song Plus 2024 vende em loja a 93–98 % da FIPE; os 125k são desconto de Revenda, não FIPE errada. |
 | 8 | **Ofertas não fechadas dominando modelo raro** (<3 fechadas) | Etios 2017: 1 fechada + 8 ofertas → 53,5k vs mesa 40k | <5 fechadas: MAPE 6,2 % vs 4,0 % com 5–9 | já cai em confiança baixa; regra de "sugestão, não preço" |
 | 9 | **Não é buraco: a mesa pagou acima da FIPE** (0 km, troca na venda de novo) | HB20S 0 km a 114 % da FIPE, margem −1,1 %; Dolphin 2027 a 106 %, −3,5 % | 78 casos >95 % da FIPE em 2026 (27 nas três marcas), um terço com margem negativa (metade nas três marcas) | **feito**: alerta na tela quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`); dispara em 0,6 % das avaliações da régua, onde a margem se pagasse o recomendado é negativa em 42 % |
+| 10 | **Flag de blindado quase vazia** (30/10) — a coluna "BLindado" da plataforma marca 76 das 312 compras blindadas de 2025-26; o legado não tem a coluna. O avaliador escreve na observação ("Blindado CARBON", "Blindagem Endure, vidros AGP") | 81 casos blindados na régua (a coluna via 10): algoritmo pagava **−6,4 %** abaixo da mesa, viés −5,2 % vs ideal, 24 deles saíam como "preço oficial" | 4 % das avaliações, concentradas em BMW/Toyota/VW/Jeep | **corrigido** (`blindado_from_notes`): flag = coluna OU observação, com negações excluídas ("sem blindagem", "não é blindado"; "sem garantia de blindagem" continua blindado). Blindados passam a −1,5 % da mesa, viés −1,4 %, e **todos** caem em sugestão pelo portão. MAPE geral 6,5 → 6,4 %. De quebra, a tela carregava a base de avaliações com as regras de acabamento ligadas (padrão do loader) enquanto o config dizia desligado — agora os dois seguem o config. |
+| 11 | **Não é buraco: estado do carro não informado** — HB20 2024 Comfort manual, 11 mil km, FIPE 75k: mesa pagou 54k (72 % da FIPE) "após laudo", vendido a 63k (84 % da FIPE) em 25 dias | os 8 comparáveis fechados (HB20 2024, 5–17 mil km) foram pagos a 82–98 % da FIPE e vendidos a 86–107 % (mediana 101 %); um HB20 2024 normal vende a ~79k. O algoritmo deu 67k, certo para um carro normal; o laudo tirou ~20 % do carro e o custo de reparo veio vazio | 6 % das avaliações mencionam estado/laudo na observação; só 38 % delas informam custo de reparo | processo, não motor: quando o laudo derruba o preço, o custo de reparo (`estimated_repair_cost`, já subtraído pelo motor) precisa ser preenchido. Sem esse dado nenhum comparável explica o carro. |
 
 **Item 7 em detalhe — a hipótese "FIPE descolada" não se sustenta nos dados.** Testadas três
 leituras, todas na régua de 2.138 casos:
@@ -706,11 +708,12 @@ Em produção o número real fica entre os dois até a recalibração do mês se
 | limpeza | vários | removidos `km_pct_per_10k`, `FATOR_ANO`, `blindado_premiums` (config morto), aliases de compatibilidade; docstrings corrigidas |
 | alerta | `analysis/appraisal.py` (`_apply_fipe_ratio_alert`), `result.py` | aviso quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`) |
 | portão | `analysis/appraisal.py` (`_apply_official_gate`), `config.OfficialGateConfig`, `result.py`, `backtest/runner.py` | preço oficial × sugestão por confiança calibrada + idade/KM/0 km/marca/modelo (4.8) |
+| blindado | `ingestion/appraisal_history.py`, `pages/_avaliacao/loaders.py` | flag lida também da observação (`blindado_from_notes`); loaders da tela seguem o config (acabamento, blindado) |
 | config | `config.yaml` | pilha final ligada, com os valores antigos anotados para reproduzir a régua |
 
-Testes: **458** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
+Testes: **467** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
 shrinkage, perfil por marca, ensemble, toggles da âncora B, confiança, integração, backtest,
-higiene da base, acabamentos, alerta de FIPE e portão de preço oficial.
+higiene da base, acabamentos, alerta de FIPE, portão de preço oficial e blindado pela observação.
 
 ### 5.2 Como reproduzir
 

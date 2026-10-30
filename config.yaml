@@ -114,6 +114,9 @@ appraisal:
   # no geral e piores por família (o ratio ja normaliza pela FIPE, que e por versao; separar
   # so encolhe a amostra). Mecanismo em utils/model_generation.TRIM_RULES; fica desligado.
   trim_rules_enabled: false
+  # A coluna "BLindado" da plataforma marca so 76 das 312 compras blindadas de 2025-26 e o
+  # legado nem tem a coluna; a observacao do avaliador quase sempre diz. Le das duas.
+  blindado_from_notes: true
   reconcile_paid_with_sales: true
   reconcile_tolerance: 0.05
   ratio_floor_by_age: {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40}

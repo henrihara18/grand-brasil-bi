@@ -85,6 +85,15 @@ APPRAISAL_COLUMN_MAP_V2: dict[str, str] = {
     "BLindado": "blindado_flag",
 }
 
+# Blindado detection in the free-text notes. The platform's "BLindado" column marks
+# only ~1 in 4 of the armored cars we bought (76 of 312 closed deals in 2025-26) and the
+# legacy export has no such column; the appraiser almost always writes it in the notes
+# ("Blindado CARBON", "Blindagem Endure, vidros AGP"). Negations ("Sem blindagem",
+# "não é blindado") are excluded; "sem garantia de blindagem" is still a blindado.
+_BLINDADO_NOTE_RE = r"blind"
+_BLINDADO_NEGATION_RE = r"(n[aã]o\s+(é\s+|e\s+|consta\s+)?blind|sem\s+blind(agem|ado)(?!\s*,?\s*(de\s+)?garantia))"
+_NOTES_COLUMNS = ("Observações", "Observacoes", "Observação", "Obs")
+
 # Ratio bounds used to discard clearly-bad rows (data entry errors, outliers).
 # These bounds are intentionally wide — the algorithm will median-aggregate
 # the kept rows, so a couple of percentage points of noise at the tail is fine.
@@ -110,6 +119,7 @@ def load_appraisal_history(
     include_avaliado: bool = True,
     status_weights: Optional[dict[str, float]] = None,
     trim_rules: bool = True,
+    blindado_from_notes: bool = True,
 ) -> pd.DataFrame:
     """Load the historical appraisal Excel into a cleaned DataFrame.
 
@@ -176,6 +186,21 @@ def load_appraisal_history(
         df["blindado_flag"] = (
             df["blindado_flag"].astype(str).str.strip().str.upper().eq("SIM")
         )
+    else:
+        df["blindado_flag"] = False
+    df["blindado_source"] = df["blindado_flag"].map({True: "coluna", False: ""})
+    if blindado_from_notes:
+        notes_col = next((c for c in _NOTES_COLUMNS if c in df.columns), None)
+        if notes_col is not None:
+            notes = df[notes_col].fillna("").astype(str)
+            from_notes = (
+                notes.str.contains(_BLINDADO_NOTE_RE, case=False, regex=True)
+                & ~notes.str.contains(_BLINDADO_NEGATION_RE, case=False, regex=True)
+                & ~df["blindado_flag"]
+            )
+            df.loc[from_notes, "blindado_flag"] = True
+            df.loc[from_notes, "blindado_source"] = "observacao"
+            logger.info(f"Blindado: {int(df['blindado_flag'].sum())} rows ({int(from_notes.sum())} from notes)")
 
     # Normalize brand and model for matching
     df["brand"] = df["brand"].astype(str).str.strip().str.upper()

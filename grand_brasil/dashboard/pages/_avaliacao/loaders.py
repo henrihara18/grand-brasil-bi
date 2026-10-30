@@ -176,15 +176,22 @@ def load_appraisal_data(
         None,
     )
 
+    # Same switches as the backtest, so the screen prices with the measured stack
+    load_kw = {
+        "status_weights": status_weights,
+        "trim_rules": appraisal_cfg.trim_rules_enabled if appraisal_cfg else False,
+        "blindado_from_notes": appraisal_cfg.blindado_from_notes if appraisal_cfg else True,
+    }
+
     url = _get_secret("APPRAISAL_HISTORY_URL")
     df: Optional[pd.DataFrame] = None
 
     if url:
         try:
             with st.spinner("Carregando base de avaliacoes historicas..."):
-                df = _load_appraisals_from_gdrive(url, status_weights)
+                df = _load_appraisals_from_gdrive(url, **load_kw)
                 if legacy_path is not None:
-                    legacy_df = load_appraisal_history(legacy_path, status_weights=status_weights)
+                    legacy_df = load_appraisal_history(legacy_path, **load_kw)
                     df = merge_with_legacy(df, legacy_df, legacy_until)
         except Exception as e:
             logger.exception("Failed to load appraisal base from Google Drive")
@@ -192,7 +199,7 @@ def load_appraisal_data(
     elif legacy_path is not None:
         try:
             with st.spinner("Carregando base de avaliacoes historicas..."):
-                df = load_appraisal_history(legacy_path, status_weights=status_weights)
+                df = load_appraisal_history(legacy_path, **load_kw)
         except Exception as e:
             logger.exception("Failed to load appraisal base")
             st.warning(f"Nao foi possivel carregar base de avaliacoes: {e}")
@@ -201,13 +208,10 @@ def load_appraisal_data(
     return df
 
 
-def _load_appraisals_from_gdrive(
-    url: str,
-    status_weights: Optional[dict[str, float]] = None,
-) -> pd.DataFrame:
+def _load_appraisals_from_gdrive(url: str, **load_kw) -> pd.DataFrame:
     tmp_path = _download_gsheet_xlsx(url)
     try:
-        return load_appraisal_history(Path(tmp_path), status_weights=status_weights)
+        return load_appraisal_history(Path(tmp_path), **load_kw)
     finally:
         os.unlink(tmp_path)
 

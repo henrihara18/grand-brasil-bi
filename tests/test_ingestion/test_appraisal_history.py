@@ -39,7 +39,7 @@ def _write_excel(tmp_path: Path, rows: list[dict], filename: str = "appraisals.x
         "Ano Modelo", "KM", "Valor avaliado", "FIPE",
         "ref. AAV B2C", "ref. AAV B2B", "ref. Web",
         "Gasto previsto", "Finalidade", "Placa da Avaliação",
-        "Lojas", "Avaliador", "Classificação",
+        "Lojas", "Avaliador", "Classificação", "Observações",
     ]
     ws.append(headers)
     for r in rows:
@@ -261,7 +261,7 @@ V2_HEADERS = [
     "ID", "Empresa", "Vendedor", "Status", "Classificação", "Finalidade", "Placa",
     "Marca", "Modelo", "Versão", "Ano Modelo", "km", "Custos", "Valor Avaliado",
     "Total Avaliado", "Data Avaliação", "Valor Mesa", "BLindado",
-    "Valor Ref. Web", "Valor Ref. Fipe", "Valor Ref. Auto Avaliar", "Data de Criação",
+    "Valor Ref. Web", "Valor Ref. Fipe", "Valor Ref. Auto Avaliar", "Data de Criação", "Observações",
 ]
 
 
@@ -353,6 +353,29 @@ class TestV2Layout:
     def test_blindado_flag_sim(self, tmp_path):
         df = load_appraisal_history(_write_v2_excel(tmp_path, [_v2_row(BLindado="Sim")]))
         assert bool(df.loc[0, "blindado_flag"]) is True
+        assert df.loc[0, "blindado_source"] == "coluna"
+
+    @pytest.mark.parametrize("note,expected", [
+        ("Blindado CARBON", True),
+        ("Blindagem Endure\n Vidros AGP B33\n pequenas delaminações", True),
+        ("sem garantia de blindagem, blindagem evolution", True),
+        ("Revisões em dia / Sem blindagem", False),
+        ("Tem manual, tem chave reserva. Não é blindado", False),
+        ("Único dono, revisões em concessionária", False),
+        (None, False),
+    ])
+    def test_blindado_read_from_notes_when_column_says_no(self, tmp_path, note, expected):
+        df = load_appraisal_history(_write_v2_excel(tmp_path, [_v2_row(**{"Observações": note})]))
+        assert bool(df.loc[0, "blindado_flag"]) is expected
+        assert df.loc[0, "blindado_source"] == ("observacao" if expected else "")
+
+    def test_blindado_from_notes_can_be_switched_off(self, tmp_path):
+        df = load_appraisal_history(_write_v2_excel(tmp_path, [_v2_row(**{"Observações": "Blindado CARBON"})]), blindado_from_notes=False)
+        assert bool(df.loc[0, "blindado_flag"]) is False
+
+    def test_legacy_layout_without_column_reads_notes(self, tmp_path):
+        df = load_appraisal_history(_write_excel(tmp_path, [_row(**{"Observações": "blindado Rino, vidros Anglo"}), _row()]))
+        assert list(df["blindado_flag"]) == [True, False]
 
 
 class TestMergeWithLegacy:
