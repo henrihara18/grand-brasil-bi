@@ -91,7 +91,7 @@ APPRAISAL_COLUMN_MAP_V2: dict[str, str] = {
 # ("Blindado CARBON", "Blindagem Endure, vidros AGP"). Negations ("Sem blindagem",
 # "não é blindado") are excluded; "sem garantia de blindagem" is still a blindado.
 _BLINDADO_NOTE_RE = r"blind"
-_BLINDADO_NEGATION_RE = r"(n[aã]o\s+(é\s+|e\s+|consta\s+)?blind|sem\s+blind(agem|ado)(?!\s*,?\s*(de\s+)?garantia))"
+_BLINDADO_NEGATION_RE = r"(?:n[aã]o\s+(?:é\s+|e\s+|consta\s+)?blind|sem\s+blind(?:agem|ado)(?!\s*,?\s*(?:de\s+)?garantia))"
 _NOTES_COLUMNS = ("Observações", "Observacoes", "Observação", "Obs")
 
 # Ratio bounds used to discard clearly-bad rows (data entry errors, outliers).
