@@ -25,9 +25,28 @@ env/
 # Data (runtime, uploads, cache)
 data/uploads/*
 data/fipe_cache/*
+data/appraisal_feedback.csv
 !data/uploads/.gitkeep
 !data/fipe_cache/.gitkeep
 .cache/
+
+# Arquivos de dados na raiz (contêm dados de clientes — nunca commitar)
+# Intencionalmente: arquivos .xlsx ficam fora do git por padrão.
+# Em produção, usar SALES_HISTORY_URL e APPRAISAL_HISTORY_URL (Google Sheets).
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+# Exceção: permitir fixtures de teste, que são essenciais e são dados sintéticos
+!tests/fixtures/**
+!tests/**/*.csv
+!tests/**/*.xlsx
+
+# Excel lock files
+~$*
+
+# Arquivos de redirecionamento Windows que vazaram
+nul
 
 # OS
 .DS_Store
@@ -43,3 +62,12 @@ htmlcov/
 
 # Claude
 .claude/
+
+# Base de shortnames usada pela ingestao do RAW do ERP
+!grand_brasil/assets/Tag_Modelos.xlsx
+
+# Saidas do backtest (os numeros relevantes estao em REVISAO_PRECIFICACAO.md)
+backtest_results/
+
+# Arquivos preparados para subir no Google Drive / Streamlit Cloud (dados de clientes)
+nuvem/

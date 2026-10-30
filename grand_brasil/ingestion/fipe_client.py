@@ -18,9 +18,16 @@ from grand_brasil.models.fipe import FipeBrand, FipeModel, FipePrice, FipeYear
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://parallelum.com.br/fipe/api/v1"
+_BASE_URL = "https://api.fipe.online/fipe/api/v1"
 _TIMEOUT = 10  # seconds
-_CATALOG_TTL_DAYS = 30  # brands, models, years
+_CATALOG_TTL_DAYS = 30   # brands, models, years
+_REFERENCES_TTL_DAYS = 2  # reference month list (grows monthly)
+
+_MONTH_PT: dict[int, str] = {
+    1: "janeiro", 2: "fevereiro", 3: "mar\u00e7o", 4: "abril",
+    5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+    9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
+}
 
 
 class FipeApiError(Exception):
@@ -84,6 +91,79 @@ class FipeClient:
 
         return self._parse_price(data, year_code)
 
+    def get_references(self) -> list[dict]:
+        """Return all available FIPE reference months, newest first.
+
+        Each entry: {"Codigo": 332, "Mes": "abril/2026"}
+        Cached for 2 days (new month is added once a month).
+        """
+        cache_path = self.cache_dir / "references.json"
+        cached = self._safe_load_cache(cache_path)
+        if cached and not self._is_references_stale(cached):
+            return cached["data"]
+        raw = self._fetch(f"{_BASE_URL}/referencias")
+        self._write_cache(cache_path, raw)
+        return raw
+
+    def get_reference_code_for_date(self, sale_date: object) -> Optional[str]:
+        """Return the FIPE reference month code for a given sale date.
+
+        Args:
+            sale_date: datetime, pd.Timestamp, or ISO string.
+
+        Returns:
+            Reference code string (e.g. "329") or None if not found.
+        """
+        if sale_date is None:
+            return None
+        try:
+            if hasattr(sale_date, "month"):
+                month, year = sale_date.month, sale_date.year
+            else:
+                from datetime import datetime as _dt
+                ts = _dt.fromisoformat(str(sale_date))
+                month, year = ts.month, ts.year
+        except Exception:
+            return None
+
+        target = f"{_MONTH_PT[month]}/{year}"
+        for ref in self.get_references():
+            if ref.get("Mes") == target:
+                return str(ref["Codigo"])
+        return None
+
+    def get_historical_price(
+        self,
+        brand_code: str,
+        model_code: str,
+        year_code: str,
+        reference_code: str,
+    ) -> FipePrice:
+        """Fetch FIPE price for a specific reference month.
+
+        Historical prices never change, so the cache has no expiry.
+
+        Args:
+            brand_code: FIPE brand code (e.g. "56").
+            model_code: FIPE model code (e.g. "9325").
+            year_code:  FIPE year code (e.g. "2024-5").
+            reference_code: Reference month code (e.g. "329" = jan/2026).
+        """
+        safe_year = year_code.replace("/", "_")
+        cache_path = self.cache_dir / f"price_{brand_code}_{model_code}_{safe_year}_r{reference_code}.json"
+
+        cached = self._safe_load_cache(cache_path)
+        if cached:  # historical prices are immutable — no TTL check
+            return self._parse_price(cached["data"], year_code)
+
+        url = (
+            f"{_BASE_URL}/carros/marcas/{brand_code}/modelos/{model_code}"
+            f"/anos/{year_code}?codigoTabelaReferencia={reference_code}"
+        )
+        data = self._fetch(url)
+        self._write_cache(cache_path, data)
+        return self._parse_price(data, year_code)
+
     # ── Cache helpers ───────────────────────────────────────────────
 
     def _load_or_fetch(
@@ -111,6 +191,14 @@ class FipeClient:
         except Exception as e:
             logger.warning(f"Cache corrompido em {path}, sera ignorado: {e}")
             return None
+
+    def _is_references_stale(self, envelope: dict) -> bool:
+        """Return True if the references list cache is older than 2 days."""
+        try:
+            fetched_at = datetime.fromisoformat(envelope["fetched_at"])
+            return (datetime.now() - fetched_at).days >= _REFERENCES_TTL_DAYS
+        except Exception:
+            return True
 
     def _is_catalog_stale(self, envelope: dict) -> bool:
         """Return True if catalog cache (brands/models/years) is older than 30 days."""
@@ -143,24 +231,44 @@ class FipeClient:
     # ── Network ─────────────────────────────────────────────────────
 
     def _fetch(self, url: str) -> object:
-        """Perform a GET request and return parsed JSON."""
+        """Perform a GET request and return parsed JSON.
+
+        Retries up to 4 times on 429 (rate limit), with exponential backoff.
+        """
+        import time
         logger.debug(f"FIPE API GET: {url}")
-        try:
-            response = requests.get(url, timeout=_TIMEOUT)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.Timeout:
-            raise FipeApiError(
-                f"Tempo limite excedido ao consultar a API FIPE ({url}). "
-                "Verifique sua conexao com a internet."
-            )
-        except requests.exceptions.RequestException as e:
-            raise FipeApiError(
-                f"Erro ao consultar a API FIPE: {e}. "
-                "Verifique sua conexao com a internet."
-            )
-        except ValueError as e:
-            raise FipeApiError(f"API FIPE retornou dados inesperados em {url}: {e}")
+
+        for attempt in range(4):
+            try:
+                response = requests.get(url, timeout=_TIMEOUT)
+
+                if response.status_code == 429:
+                    wait = 2 ** attempt  # 1s, 2s, 4s, 8s
+                    logger.warning(f"FIPE API 429 — aguardando {wait}s antes de tentar novamente")
+                    time.sleep(wait)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.Timeout:
+                if attempt == 3:
+                    raise FipeApiError(
+                        f"Tempo limite excedido ao consultar a API FIPE ({url}). "
+                        "Verifique sua conexao com a internet."
+                    )
+                time.sleep(2 ** attempt)
+            except requests.exceptions.RequestException as e:
+                if attempt == 3:
+                    raise FipeApiError(
+                        f"Erro ao consultar a API FIPE: {e}. "
+                        "Verifique sua conexao com a internet."
+                    )
+                time.sleep(2 ** attempt)
+            except ValueError as e:
+                raise FipeApiError(f"API FIPE retornou dados inesperados em {url}: {e}")
+
+        raise FipeApiError(f"API FIPE nao respondeu apos 4 tentativas: {url}")
 
     # ── Parsing ─────────────────────────────────────────────────────
 
