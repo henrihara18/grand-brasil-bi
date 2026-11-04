@@ -60,8 +60,9 @@ htmlcov/
 # Streamlit
 .streamlit/
 
-# Claude
-.claude/
+# Claude: config local fica fora; as skills de negocio sao versionadas para quem clonar
+.claude/*
+!.claude/skills/
 
 # Base de shortnames usada pela ingestao do RAW do ERP
 !grand_brasil/assets/Tag_Modelos.xlsx
@@ -71,3 +72,4 @@ backtest_results/
 
 # Arquivos preparados para subir no Google Drive / Streamlit Cloud (dados de clientes)
 nuvem/
+!.claude/skills/**/*.xlsx
