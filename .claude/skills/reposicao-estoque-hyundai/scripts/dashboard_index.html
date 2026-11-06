@@ -1,0 +1,368 @@
+<style>
+#dash-root .rp { font-family: var(--font-anthropic-sans); display: grid; gap: var(--cds-gap-lg); }
+.rp h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+.rp h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.rp .sub, .rp .note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0; }
+.rp .take { font-size: var(--cds-font-size-body); margin: var(--cds-gap-xs) 0 0; max-width: 60rem; }
+.rp .take b, .rp .tile b { font-weight: 600; }
+.rp .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.rp .grid2 { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.rp .tiles { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); }
+.rp .tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md) var(--cds-pad-lg); }
+.rp .tile .lbl { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.rp .tile .big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.rp .tile .det { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.rp .ctrl { display: grid; gap: var(--cds-gap-md); }
+.rp .wgrid { border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.rp .wgrid th, .rp .wgrid td { padding: var(--cds-pad-xs) var(--cds-pad-sm); text-align: center; }
+.rp .wgrid th:first-child, .rp .wgrid td:first-child { text-align: left; }
+.rp .wgrid input { width: 4.2rem; font: inherit; padding: 2px 4px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); text-align: right; }
+.rp .wgrid input.chg { border-color: var(--color-warn); }
+.rp .opts { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); align-items: center; font-size: var(--cds-font-size-caption); }
+.rp .opts label { display: inline-flex; gap: var(--cds-gap-xs); align-items: center; }
+.rp .opts input[type=number], .rp select, .rp input[type=search] { font: inherit; padding: 3px 6px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-bg); color: var(--color-fg); }
+.rp .opts input[type=number] { width: 4rem; }
+.rp button.lnk { font: inherit; font-size: var(--cds-font-size-caption); background: none; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: 3px 10px; color: var(--color-fg); cursor: pointer; }
+.rp .badge { display: inline-block; font-size: var(--cds-font-size-caption); padding: 1px 8px; border-radius: 999px; border: 1px solid var(--color-warn); color: var(--color-warn); }
+.rp .tbar { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin: var(--cds-gap-sm) 0; font-size: var(--cds-font-size-caption); }
+.rp .tbox { max-height: 34rem; overflow: auto; border-top: 1px solid var(--color-border-line); }
+.rp table.t { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.rp table.t th { position: sticky; top: 0; background: var(--color-panel); text-align: right; font-weight: var(--cds-font-weight-medium); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; z-index: 1; }
+.rp table.t th button { all: unset; cursor: pointer; }
+.rp table.t td { text-align: right; padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.rp table.t th.l, .rp table.t td.l { text-align: left; }
+.rp table.t td.w { white-space: normal; min-width: 12rem; }
+.rp table.t td.buy { font-weight: 600; }
+.rp table.t td.zero { color: var(--color-fg-muted); font-weight: 400; }
+.rp table.t td.hot { color: var(--color-bad); }
+.rp .chip { display: inline-block; padding: 0 8px; border-radius: 999px; border: 1px solid var(--color-border-line); }
+.rp .chip.ok { color: var(--color-ok); border-color: var(--color-ok); }
+.rp .chip.warn { color: var(--color-warn); border-color: var(--color-warn); }
+.rp .chip.bad { color: var(--color-bad); border-color: var(--color-bad); }
+.rp .chart { position: relative; min-height: 220px; }
+.rp .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; display: none; z-index: 2; }
+.rp .tip .h { color: var(--cds-text-secondary); }
+.rp .legend { display: flex; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-bottom: var(--cds-gap-xs); }
+.rp .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.rp ul.met { margin: 0; padding-left: 1.1rem; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); display: grid; gap: 4px; }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+@media (max-width: 640px) { .rp .hide-n { display: none; } }
+</style>
+
+<div class="rp">
+  <header id="topo">
+    <h1>Reposição Hyundai</h1>
+    <p class="sub">Estoque disponível por versão e cor contra as vendas dos últimos meses. Meta de <span data-source="resumo" data-field="dias_meta">—</span> dias. Mês corrente <span data-source="resumo" data-field="mes_corrente">—</span>, vendas até o dia <span data-source="resumo" data-field="dia_corte">—</span>.</p>
+    <p class="note" data-source="vendas estoque">Bases: estoque Hyundai de 26/10/26 e vendas 0 km faturadas de jul/26 a 23/10/26 (relatórios do ERP enviados pelo Henri).</p>
+    <p class="take" id="take"><span class="dash-skeleton">—</span></p>
+  </header>
+
+  <section class="card ctrl" id="ajustes">
+    <div style="display:flex;justify-content:space-between;gap:var(--cds-gap-sm);flex-wrap:wrap;align-items:baseline">
+      <h2>Ajustes</h2>
+      <span><span class="badge" id="ajustado" hidden>Ajustado</span> <button class="lnk" id="reset" type="button">Voltar ao padrão</button></span>
+    </div>
+    <p class="note">Peso de cada mês na demanda. 1 = mês normal, 0 = ignorar, 0,5 = vale metade (ex.: mês com campanha ou ruptura). O mês corrente é contado pela fração do mês que historicamente já está faturada no dia de corte (véspera da foto do estoque).</p>
+    <div style="overflow-x:auto">
+      <table class="wgrid">
+        <thead><tr><th>Cenário</th><th id="hm1">—</th><th id="hm2">—</th><th id="hm3">—</th><th id="hm4">—</th></tr></thead>
+        <tbody>
+          <tr><td>A · Últimos 3 meses</td><td><input data-p="pA1" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pA2" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pA3" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pA4" type="number" min="0" max="3" step="0.25"></td></tr>
+          <tr><td>B · Último mês + corrente</td><td><input data-p="pB1" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pB2" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pB3" type="number" min="0" max="3" step="0.25"></td><td><input data-p="pB4" type="number" min="0" max="3" step="0.25"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="opts">
+      <label>Meta (dias) <input id="o-dias" type="number" min="10" max="120" step="5"></label>
+      <label>Loja <select id="o-loja"><option>Todas</option><option value="BF">Barra Funda</option><option value="GRU">Guarulhos</option></select></label>
+      <label><input id="o-transito" type="checkbox"> Contar trânsito como estoque</label>
+      <label><input id="o-pondera" type="checkbox"> Peso menor p/ venda com margem baixa ou &gt;90 dias</label>
+      <label><input id="o-trava" type="checkbox"> Travar compra em cor com carro parado</label>
+    </div>
+  </section>
+
+  <section class="tiles" id="kpis">
+    <div class="tile"><div class="lbl">Projeção do mês</div><div class="big" data-source="resumo" data-field="projecao_mes">—</div><div class="det"><span data-source="resumo" data-field="vendas_ate_corte">—</span> faturados + <span data-source="resumo" data-field="reservado">—</span> vendidos não faturados</div></div>
+    <div class="tile"><div class="lbl">Estoque considerado</div><div class="big" data-source="resumo" data-field="estoque">—</div><div class="det"><span data-source="resumo" data-field="disponivel">—</span> disp. + <span data-source="resumo" data-field="transito">—</span> trânsito</div></div>
+    <div class="tile"><div class="lbl">Cobertura hoje (A · B)</div><div class="big"><span data-source="resumo" data-field="dias_a">—</span> · <span data-source="resumo" data-field="dias_b">—</span> d</div><div class="det">demanda <span data-source="resumo" data-field="dem_a">—</span> · <span data-source="resumo" data-field="dem_b">—</span> carros/mês</div></div>
+    <div class="tile"><div class="lbl">Compra · cenário A</div><div class="big" data-source="resumo" data-field="compra_a">—</div><div class="det">últimos 3 meses cheios</div></div>
+    <div class="tile"><div class="lbl">Compra · cenário B</div><div class="big" data-source="resumo" data-field="compra_b">—</div><div class="det">último mês + corrente</div></div>
+    <div class="tile"><div class="lbl">Disponíveis &gt; 90 dias</div><div class="big" data-source="resumo" data-field="q90">—</div><div class="det">giram antes de repor a cor</div></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card" id="vendas-mes">
+      <h2>Vendas por mês</h2>
+      <p class="note">Mês corrente: faturado até o corte e o que falta pela curva histórica.</p>
+      <div class="legend"><span><i style="background:var(--cds-chart-muted)"></i>Faturado</span><span><i id="lg-proj"></i>Projeção restante</span></div>
+      <div class="chart" id="ch-mes" data-source="mensal"></div>
+    </div>
+    <div class="card" id="cobertura">
+      <h2>Cobertura por família, em dias</h2>
+      <p class="note">Estoque considerado ÷ demanda de cada cenário. Linha tracejada = meta.</p>
+      <div class="legend"><span><i id="lg-a"></i>Cenário A</span><span><i id="lg-b"></i>Cenário B</span></div>
+      <div class="chart" id="ch-fam" data-source="familias"></div>
+    </div>
+  </section>
+
+  <section class="card" id="familias">
+    <h2>Resumo por família</h2>
+    <div class="tbox"><table class="t" id="t-fam" data-source="familias" data-row-key="familia"></table></div>
+  </section>
+
+  <section class="card" id="versao-cor">
+    <h2>Versão × cor externa</h2>
+    <p class="note">Dem = demanda em carros/mês. Dias hoje = estoque considerado ÷ demanda do cenário A. "Comprar só no recente" indica cor acelerando; "só no 3 meses", cor perdendo ritmo.</p>
+    <div class="tbar">
+      <select id="f-fam" aria-label="Família"><option value="">Todas as famílias</option></select>
+      <select id="f-leit" aria-label="Leitura"><option value="">Todas as leituras</option></select>
+      <label><input id="f-buy" type="checkbox"> Só com compra</label>
+      <input id="f-q" type="search" placeholder="Buscar versão ou cor" aria-label="Buscar">
+      <span class="note" id="f-n"></span>
+    </div>
+    <div class="tbox"><table class="t" id="t-cor" data-source="cores" data-row-key="chave"></table></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card" id="internas">
+      <h2>Compra por cor interna</h2>
+      <p class="note">Rateio da compra de cada cor externa pelo déficit de cada interna; sem déficit, pelo mix de vendas.</p>
+      <div class="tbox"><table class="t" id="t-int" data-source="internas" data-row-key="chave"></table></div>
+    </div>
+    <div class="card" id="parados">
+      <h2>Estoque parado há mais de 60 dias</h2>
+      <p class="note">Prioridade de giro. Cor com carro acima de 90 dias não compra; entre 60 e 90, compra metade.</p>
+      <div class="tbox"><table class="t" id="t-env" data-source="envelhecidos" data-row-key="id"></table></div>
+    </div>
+  </section>
+
+  <section class="card" id="metodo">
+    <h2>Como o número é calculado</h2>
+    <ul class="met">
+      <li>Estoque considerado = disponível (inclui carros reservados só para acessórios) + trânsito livre (opcional). Carros com proposta de cliente são vendidos do mês ainda não faturados: saem do estoque e abatem das vendas que faltam no mês. Carro em blindagem e demonstração ficam fora.</li>
+      <li>Demanda = vendas ponderadas × peso do mês ÷ meses equivalentes. O mês corrente vale a fração do mês já vendida historicamente até o dia de corte.</li>
+      <li>Venda com % MI 3 pp abaixo da média da versão (ou abaixo de 2%) vale 0,5; venda de carro com mais de 90 dias de estoque vale 0,5.</li>
+      <li>i20 só conta a partir de jul/26 (lançamento).</li>
+      <li>Compra = meta − estoque projetado no fim do mês, vezes a trava de envelhecimento, arredondada (fração ≥ 0,5 sobe).</li>
+    </ul>
+  </section>
+</div>
+
+<script src="compute.js"></script>
+<script>
+(() => {
+  const D = window.repoDefaults;
+  const nf1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const nf0 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const ml = (ym) => { if (!ym) return '—'; const [y, m] = ym.split('-'); return MES[Number(m) - 1] + '/' + y.slice(2); };
+  const f0 = (v) => (v == null || v === '' ? '—' : nf0.format(v));
+  const f1 = (v) => (v == null || v === '' ? '—' : nf1.format(v));
+
+  // calcs no padrão (o que o Sources mostra); a página recalcula com os ajustes do leitor
+  dash.calc('modelo', { inputs: ['vendas', 'estoque'], title: 'Modelo de reposição (padrão)',
+    description: 'Cálculo completo com os pesos padrão (A: 3 meses cheios; B: último mês + corrente), meta 30 dias.',
+    fn: (vendas, estoque) => window.repoCompute(vendas, estoque, window.repoDefaults) });
+  dash.calc('resumo', { inputs: ['modelo'], title: 'Resumo da reposição', description: 'Totais da marca nos dois cenários.', fn: (modelo) => modelo.resumo });
+  dash.calc('cores', { inputs: ['modelo'], title: 'Compra por versão e cor', description: 'Uma linha por versão × cor externa.', fn: (modelo) => modelo.cores });
+  dash.calc('internas', { inputs: ['modelo'], title: 'Compra por cor interna', description: 'Rateio da compra pelas cores internas.', fn: (modelo) => modelo.internas });
+  dash.calc('familias', { inputs: ['modelo'], title: 'Resumo por família', description: 'Vendas, estoque, cobertura e compra por família.', fn: (modelo) => modelo.familias });
+  dash.calc('mensal', { inputs: ['modelo'], title: 'Vendas por mês', description: 'Faturado por mês e projeção restante do mês corrente.', fn: (modelo) => modelo.mensal });
+  dash.calc('envelhecidos', { inputs: ['modelo'], title: 'Estoque parado', description: 'Disponíveis com mais de 60 dias em estoque.', fn: (modelo) => modelo.envelhecidos });
+
+  // ----- controles
+  const opts = () => ({ ...D, ...dash.params() });
+  const set = (k, v) => dash.setParams({ [k]: v });
+  document.querySelectorAll('#ajustes input[data-p]').forEach((inp) => {
+    inp.addEventListener('change', () => { const v = Number(String(inp.value).replace(',', '.')); if (Number.isFinite(v) && v >= 0) set(inp.dataset.p, v); });
+  });
+  const oDias = document.getElementById('o-dias');
+  oDias.addEventListener('change', () => { const v = Number(oDias.value); if (v >= 5) set('dias', v); });
+  document.getElementById('o-loja').addEventListener('change', (e) => set('loja', e.target.value));
+  ['transito', 'pondera', 'trava'].forEach((k) => document.getElementById('o-' + k).addEventListener('change', (e) => set(k, e.target.checked)));
+  document.getElementById('reset').addEventListener('click', () => { dash.resetParams(); dash.setParams({ ...D }); });
+  const st = { fam: '', leit: '', buy: false, q: '', sort: { cor: ['compra_b', -1], int: ['compra_b', -1], fam: ['compra_b', -1], env: ['dias', -1] } };
+  let last = null;
+  document.getElementById('f-fam').addEventListener('change', (e) => { st.fam = e.target.value; drawCores(); });
+  document.getElementById('f-leit').addEventListener('change', (e) => { st.leit = e.target.value; drawCores(); });
+  document.getElementById('f-buy').addEventListener('change', (e) => { st.buy = e.target.checked; drawCores(); });
+  document.getElementById('f-q').addEventListener('input', (e) => { st.q = e.target.value.toLowerCase(); drawCores(); });
+
+  // ----- tabela genérica
+  function table(el, sortKey, cols, rows, keyOf) {
+    const s = st.sort[sortKey];
+    if (!el.tHead) {
+      const tr = el.createTHead().insertRow();
+      cols.forEach((c) => {
+        const th = document.createElement('th'); th.dataset.field = c.f; if (c.l) th.className = 'l'; if (c.hide) th.classList.add('hide-n');
+        const b = document.createElement('button'); b.type = 'button'; b.addEventListener('click', () => { st.sort[sortKey] = [c.f, s && st.sort[sortKey][0] === c.f ? -st.sort[sortKey][1] : (c.l ? 1 : -1)]; redraw(); });
+        th.appendChild(b); tr.appendChild(th);
+      });
+      el.createTBody();
+    }
+    [...el.tHead.rows[0].cells].forEach((th, i) => {
+      const c = cols[i]; th.firstChild.textContent = (typeof c.h === 'function' ? c.h() : c.h);
+      th.setAttribute('aria-sort', st.sort[sortKey][0] === c.f ? (st.sort[sortKey][1] > 0 ? 'ascending' : 'descending') : 'none');
+    });
+    const [sf, sd] = st.sort[sortKey];
+    const sorted = [...rows].sort((a, b) => { const x = a[sf], y = b[sf]; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y))) * sd; });
+    const tb = el.tBodies[0]; tb.replaceChildren();
+    sorted.forEach((r) => {
+      const tr = tb.insertRow(); tr.dataset.key = keyOf(r);
+      cols.forEach((c) => {
+        const td = tr.insertCell(); const v = r[c.f];
+        if (c.l) td.className = 'l'; if (c.w) td.classList.add('w'); if (c.hide) td.classList.add('hide-n');
+        if (c.buy) { td.classList.add('buy'); if (!v) td.classList.add('zero'); }
+        if (c.hot && v != null && v > c.hot) td.classList.add('hot');
+        if (c.chip) { const sp = document.createElement('span'); sp.className = 'chip ' + chipCls(v); sp.textContent = v; td.appendChild(sp); }
+        else td.textContent = c.fmt ? c.fmt(v) : (v == null ? '—' : v);
+      });
+    });
+    return sorted.length;
+  }
+  const chipCls = (v) => (/^Comprar$/.test(v) ? 'ok' : /^Comprar só/.test(v) ? 'warn' : /Excesso|Sem venda|Travado/.test(v) ? 'bad' : '');
+
+  let R = null, M = [];
+  const mh = (i) => () => ml(M[i]);
+  const colsCor = [
+    { f: 'familia', h: 'Família', l: 1 }, { f: 'versao', h: 'Versão', l: 1, w: 1 }, { f: 'cor_ext', h: 'Cor externa', l: 1 },
+    { f: 'v1', h: mh(0), fmt: f0, hide: 1 }, { f: 'v2', h: mh(1), fmt: f0, hide: 1 }, { f: 'v3', h: mh(2), fmt: f0 }, { f: 'v4', h: () => ml(M[3]) + '*', fmt: f0 },
+    { f: 'disponivel', h: 'Disp.', fmt: f0 }, { f: 'transito', h: 'Trâns.', fmt: f0 }, { f: 'reservado', h: 'Vend. n/ fat.', fmt: f0, hide: 1 },
+    { f: 'de_max', h: 'D.E máx', fmt: f0, hot: 90 }, { f: 'mi_medio', h: '% MI', fmt: f1, hide: 1 },
+    { f: 'dem_a', h: 'Dem A', fmt: f1 }, { f: 'dem_b', h: 'Dem B', fmt: f1 }, { f: 'dias_a', h: 'Dias hoje', fmt: f0 },
+    { f: 'compra_a', h: 'Compra A', fmt: f0, buy: 1 }, { f: 'compra_b', h: 'Compra B', fmt: f0, buy: 1 }, { f: 'leitura', h: 'Leitura', l: 1, chip: 1 }
+  ];
+  const colsFam = [
+    { f: 'familia', h: 'Família', l: 1 }, { f: 'vendas_m1', h: mh(0), fmt: f0, hide: 1 }, { f: 'vendas_m2', h: mh(1), fmt: f0 }, { f: 'vendas_m3', h: mh(2), fmt: f0 }, { f: 'vendas_m4', h: () => ml(M[3]) + '*', fmt: f0 },
+    { f: 'estoque', h: 'Estoque', fmt: f0 }, { f: 'dem_a', h: 'Dem A', fmt: f1 }, { f: 'dem_b', h: 'Dem B', fmt: f1 },
+    { f: 'dias_a', h: 'Dias A', fmt: f0 }, { f: 'dias_b', h: 'Dias B', fmt: f0 }, { f: 'compra_a', h: 'Compra A', fmt: f0, buy: 1 }, { f: 'compra_b', h: 'Compra B', fmt: f0, buy: 1 },
+    { f: 'excesso_a', h: 'Excesso', fmt: f1, hide: 1 }, { f: 'q90', h: '>90 d', fmt: f0 }
+  ];
+  const colsInt = [
+    { f: 'versao', h: 'Versão', l: 1, w: 1 }, { f: 'cor_ext', h: 'Externa', l: 1 }, { f: 'cor_int', h: 'Interna', l: 1 },
+    { f: 'vendas', h: 'Vendas', fmt: f0 }, { f: 'disponivel', h: 'Disp.', fmt: f0 }, { f: 'compra_a', h: 'Compra A', fmt: f0, buy: 1 }, { f: 'compra_b', h: 'Compra B', fmt: f0, buy: 1 }
+  ];
+  const colsEnv = [
+    { f: 'id', h: '#', fmt: f0, hide: 1 }, { f: 'versao', h: 'Versão', l: 1, w: 1 }, { f: 'cor_ext', h: 'Externa', l: 1 }, { f: 'cor_int', h: 'Interna', l: 1, hide: 1 },
+    { f: 'dias', h: 'Dias', fmt: f0, hot: 90 }, { f: 'loja', h: 'Loja', l: 1 }, { f: 'vendas_cor_3m', h: 'Vendas cor', fmt: f0 }
+  ];
+
+  function drawCores() {
+    if (!R) return;
+    const fs = document.getElementById('f-fam'), fl = document.getElementById('f-leit');
+    const fams = [...new Set(R.cores.map((c) => c.familia))].sort(), leits = [...new Set(R.cores.map((c) => c.leitura))].sort();
+    if (fs.options.length !== fams.length + 1) { fs.replaceChildren(new Option('Todas as famílias', ''), ...fams.map((f) => new Option(f))); fs.value = st.fam; }
+    if (fl.options.length !== leits.length + 1) { fl.replaceChildren(new Option('Todas as leituras', ''), ...leits.map((f) => new Option(f))); fl.value = st.leit; }
+    const rows = R.cores.filter((c) => (!st.fam || c.familia === st.fam) && (!st.leit || c.leitura === st.leit) && (!st.buy || c.compra_a > 0 || c.compra_b > 0)
+      && (!st.q || (c.versao + ' ' + c.cor_ext).toLowerCase().includes(st.q)));
+    const n = table(document.getElementById('t-cor'), 'cor', colsCor, rows, (r) => r.chave);
+    document.getElementById('f-n').textContent = n + ' de ' + R.cores.length + ' linhas · *até o corte';
+  }
+
+  // ----- gráficos
+  const tip = (box) => { let t = box.querySelector('.tip'); if (!t) { t = document.createElement('div'); t.className = 'tip'; box.appendChild(t); } return t; };
+  const showTip = (box, t, ev, head, lines) => {
+    t.replaceChildren(); const h = document.createElement('div'); h.className = 'h'; h.textContent = head; t.appendChild(h);
+    lines.forEach(([c, txt]) => { const d = document.createElement('div'); if (c) { const i = document.createElement('i'); i.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:' + c; d.appendChild(i); } d.appendChild(document.createTextNode(txt)); t.appendChild(d); });
+    t.style.display = 'block'; const r = box.getBoundingClientRect(); let x = ev.clientX - r.left + 12; const w = t.offsetWidth;
+    if (x + w > r.width) x = Math.max(0, ev.clientX - r.left - w - 12); t.style.left = x + 'px'; t.style.top = Math.max(0, ev.clientY - r.top - 10) + 'px';
+  };
+  const hideTip = (t) => { t.style.display = 'none'; };
+
+  function drawMes(rows) {
+    const box = document.getElementById('ch-mes'); const W = Math.max(260, box.clientWidth), H = 220, m = { t: 18, r: 8, b: 26, l: 32 };
+    d3.select(box).selectAll('svg').remove(); const t = tip(box); if (!rows.length) return;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const x = d3.scaleBand(rows.map((r) => r.mes), [m.l, W - m.r]).padding(0.35);
+    const y = d3.scaleLinear([0, d3.max(rows, (r) => r.vendas + r.projecao) * 1.1 || 1], [H - m.b, m.t]).nice();
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y).attr('y2', y).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 6).attr('y', (d) => y(d) + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((d) => nf0.format(d));
+    svg.append('g').selectAll('text').data(rows).join('text').attr('x', (r) => x(r.mes) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((r) => ml(r.mes));
+    const bw = Math.min(32, x.bandwidth()), off = (x.bandwidth() - bw) / 2;
+    const g = svg.append('g').selectAll('g').data(rows).join('g');
+    g.append('rect').attr('x', (r) => x(r.mes) + off).attr('width', bw).attr('y', (r) => y(r.vendas)).attr('height', (r) => y(0) - y(r.vendas)).attr('rx', 4).attr('fill', 'var(--cds-chart-muted)');
+    g.filter((r) => r.projecao > 0).append('rect').attr('x', (r) => x(r.mes) + off).attr('width', bw).attr('y', (r) => y(r.vendas + r.projecao)).attr('height', (r) => y(r.vendas) - y(r.vendas + r.projecao) - 2).attr('rx', 4).attr('fill', dash.colors[0]).attr('opacity', 0.75);
+    g.append('text').attr('x', (r) => x(r.mes) + x.bandwidth() / 2).attr('y', (r) => y(r.vendas + r.projecao) - 5).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg)').style('font-size', 'var(--cds-font-size-caption)').text((r) => nf0.format(r.vendas + r.projecao));
+    g.append('rect').attr('x', (r) => x(r.mes)).attr('width', x.bandwidth()).attr('y', m.t).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+      .on('mousemove', (ev, r) => showTip(box, t, ev, ml(r.mes), r.projecao ? [['var(--cds-chart-muted)', 'Faturado ' + nf0.format(r.vendas)], [dash.colors[0], 'Projeção restante ' + nf0.format(r.projecao)]] : [[null, nf0.format(r.vendas) + ' carros']]))
+      .on('mouseleave', () => hideTip(t));
+  }
+
+  function drawFam(rows, meta) {
+    const box = document.getElementById('ch-fam'); d3.select(box).selectAll('svg').remove(); const t = tip(box);
+    rows = rows.filter((r) => r.dem_a > 0 || r.dem_b > 0); if (!rows.length) return;
+    const W = Math.max(260, box.clientWidth), rowH = 34, m = { t: 8, r: 34, b: 22, l: 8 };
+    const tmp = d3.select(box).append('svg').attr('width', 0).attr('height', 0);
+    const lw = d3.max(rows, (r) => { const n = tmp.append('text').style('font-size', 'var(--cds-font-size-caption)').text(r.familia).node(); const w = n.getComputedTextLength(); return w; }); tmp.remove();
+    m.l = lw + 12; const H = m.t + m.b + rows.length * rowH;
+    const vmax = Math.min(300, d3.max(rows, (r) => Math.max(r.dias_a || 0, r.dias_b || 0, meta)) * 1.08);
+    const x = d3.scaleLinear([0, vmax], [m.l, W - m.r]).nice(); const cl = (v) => Math.min(v || 0, x.domain()[1]);
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    svg.append('g').selectAll('line').data(x.ticks(4)).join('line').attr('x1', x).attr('x2', x).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(x.ticks(4)).join('text').attr('x', x).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((d) => nf0.format(d));
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r, i) => `translate(0,${m.t + i * rowH})`);
+    g.append('text').attr('x', m.l - 8).attr('y', rowH / 2 + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg)').style('font-size', 'var(--cds-font-size-caption)').text((r) => r.familia);
+    [['dias_a', 0, 6], ['dias_b', 1, 18]].forEach(([k, ci, yy]) => {
+      g.append('rect').attr('x', m.l).attr('y', yy - 2).attr('height', 10).attr('width', (r) => Math.max(0, x(cl(r[k])) - m.l)).attr('rx', 4).attr('fill', dash.colors[ci]);
+      g.append('text').attr('x', (r) => x(cl(r[k])) + 4).attr('y', yy + 7).attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((r) => (r[k] == null ? '' : (r[k] > x.domain()[1] ? '>' : '') + nf0.format(Math.min(r[k], 999))));
+    });
+    svg.append('line').attr('x1', x(meta)).attr('x2', x(meta)).attr('y1', m.t - 4).attr('y2', H - m.b).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '4 3');
+    g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', 'transparent')
+      .on('mousemove', (ev, r) => showTip(box, t, ev, r.familia, [[dash.colors[0], 'A: ' + f0(r.dias_a) + ' dias'], [dash.colors[1], 'B: ' + f0(r.dias_b) + ' dias'], [null, 'Estoque ' + f0(r.estoque) + ' · compra A ' + f0(r.compra_a) + ' / B ' + f0(r.compra_b)]]))
+      .on('mouseleave', () => hideTip(t));
+  }
+
+  function setText(sel, v) { document.querySelectorAll(sel).forEach((el) => { el.textContent = v; el.classList.remove('dash-skeleton'); }); }
+
+  function redraw() {
+    if (!last) return;
+    const o = opts();
+    R = window.repoCompute(last.v, last.e, o);
+    const s = R.resumo[0]; M = [s.m1, s.m2, s.m3, s.m4];
+    // controles
+    ['pA1','pA2','pA3','pA4','pB1','pB2','pB3','pB4'].forEach((k) => { const inp = document.querySelector(`[data-p="${k}"]`); if (inp !== document.activeElement) inp.value = o[k]; inp.classList.toggle('chg', Number(o[k]) !== D[k]); });
+    if (oDias !== document.activeElement) oDias.value = o.dias;
+    document.getElementById('o-loja').value = o.loja;
+    ['transito', 'pondera', 'trava'].forEach((k) => { document.getElementById('o-' + k).checked = !!o[k]; });
+    const changed = Object.keys(D).some((k) => String(o[k]) !== String(D[k]));
+    document.getElementById('ajustado').hidden = !changed;
+    M.forEach((mm, i) => { document.getElementById('hm' + (i + 1)).textContent = ml(mm) + (i === 3 ? ' (corrente)' : ''); });
+    // KPIs e textos
+    document.querySelectorAll('[data-source="resumo"][data-field]').forEach((el) => {
+      const f = el.dataset.field, v = s[f];
+      el.textContent = f === 'mes_corrente' ? ml(v) : (f === 'dem_a' || f === 'dem_b') ? f1(v) : f0(v);
+      el.classList.remove('dash-skeleton');
+    });
+    // takeaway
+    const fams = R.familias; const dif = [...fams].sort((a, b) => Math.abs(b.compra_b - b.compra_a) - Math.abs(a.compra_b - a.compra_a))[0];
+    const curta = [...fams].filter((f) => f.dias_a != null).sort((a, b) => a.dias_a - b.dias_a)[0];
+    const take = document.getElementById('take'); take.replaceChildren();
+    const add = (txt, bold) => { const el = document.createElement(bold ? 'b' : 'span'); el.textContent = txt; take.appendChild(el); };
+    add('Pelos últimos 3 meses, a sugestão é comprar '); add(f0(s.compra_a) + ' carros', 1); add('; olhando o último mês e o corrente, '); add(f0(s.compra_b), 1); add('. ');
+    if (curta) { add(curta.familia + ' é a família mais curta, com ' + f0(curta.dias_a) + ' dias de cobertura. '); }
+    if (dif && dif.compra_b !== dif.compra_a) { add('A maior diferença entre os cenários está em ' + dif.familia + ' (' + f0(dif.compra_a) + ' × ' + f0(dif.compra_b) + ').'); }
+    // gráficos e tabelas
+    drawMes(R.mensal); drawFam(R.familias, Number(o.dias) || 30);
+    table(document.getElementById('t-fam'), 'fam', colsFam, R.familias, (r) => r.familia);
+    drawCores();
+    table(document.getElementById('t-int'), 'int', colsInt, R.internas, (r) => r.chave);
+    table(document.getElementById('t-env'), 'env', colsEnv, R.envelhecidos, (r) => String(r.id));
+  }
+
+  document.getElementById('lg-proj').style.background = dash.colors[0];
+  document.getElementById('lg-a').style.background = dash.colors[0];
+  document.getElementById('lg-b').style.background = dash.colors[1];
+
+  dash.onData(() => {
+    const v = dash.data('vendas'), e = dash.data('estoque');
+    if (v.status !== 'ok' || e.status !== 'ok') {
+      const failed = v.status === 'error' || e.status === 'error';
+      document.getElementById('take').textContent = failed ? 'Falha ao carregar os dados.' : '';
+      return;
+    }
+    last = { v: v.data, e: e.data };
+    redraw();
+  });
+})();
+</script>
