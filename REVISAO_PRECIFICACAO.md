@@ -760,6 +760,12 @@ e "basear na venda" puxam em direções opostas; o modelo de dois preços (abert
 proposta. Por que M mesmo empatando: ela lê só vendas, então não aprende com as sugestões do
 próprio motor quando ele estiver no ar (fase B do backlog), e é a base natural da tabela mestra.
 
+Bug lateral 2 (tela): a âncora B pedia à API da FIPE o valor histórico de **cada** venda comparável
+(uma chamada por mês de venda, limitada a ~1 resposta a cada 30 s após 429): um HB20 com 107 vendas
+levava mais de 10 minutos. `pages/_avaliacao/fipe_hybrid.py` lê a FIPE histórica da tabela offline
+montada das avaliações (a mesma do backtest) e só consulta a API para meses que a tabela não tem:
+a mesma avaliação passou a levar ~20 s.
+
 Bug lateral corrigido: `appraise()` sobrescrevia `reference_date` com "agora" mesmo quando o backtest
 passava o corte do mês (inócuo para medianas ponderadas, mas errado).
 

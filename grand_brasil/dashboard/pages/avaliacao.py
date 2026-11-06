@@ -56,6 +56,7 @@ from grand_brasil.dashboard.pages._avaliacao.loaders import (
     load_fipe_years,
     load_sales_data,
 )
+from grand_brasil.dashboard.pages._avaliacao.fipe_hybrid import HybridFipeClient
 from grand_brasil.dashboard.pages._avaliacao.result import render_result
 from grand_brasil.dashboard.pages._avaliacao.webmotors import render_webmotors
 
@@ -397,8 +398,11 @@ def _run_appraisal(
     )
 
     sales_df = _sales_with_market_ratios(sales_df, appraisal_df, appraisal_cfg)
+    # Historical FIPE from the offline table (same as the backtest); the live API only fills gaps.
+    # Before this, one API call per comparable sale month made high-volume models take minutes.
+    hybrid_client = HybridFipeClient(fipe_client, _fipe_table(appraisal_df), req_model_red)
 
-    with st.spinner("Calculando avaliacao (buscando FIPE historica)..."):
+    with st.spinner("Calculando avaliacao..."):
         result = appraise(
             request=request,
             sales_df=sales_df,
@@ -408,7 +412,7 @@ def _run_appraisal(
             min_comparables=appraisal_cfg.min_comparables,
             recency_halflife_days=appraisal_cfg.recency_halflife_days,
             year_pct_per_year=appraisal_cfg.year_pct_per_year,
-            fipe_client=fipe_client,
+            fipe_client=hybrid_client,
             fipe_brand_code=selected_brand.code,
             fipe_model_code=selected_model.code,
             fipe_year_code=selected_year.code,
@@ -460,3 +464,20 @@ def _sales_with_market_ratios(sales_df, appraisal_df, appraisal_cfg):
         return sales_df
     st.session_state[key] = enriched
     return enriched
+
+
+def _fipe_table(appraisal_df):
+    """FIPE by model, year and month from the appraisal base, built once per session."""
+    if appraisal_df is None:
+        return None
+    key = f"fipe_table_{len(appraisal_df)}"
+    table = st.session_state.get(key)
+    if table is None:
+        try:
+            from grand_brasil.backtest.fipe_table import FipeTable
+            table = FipeTable(appraisal_df)
+        except Exception:
+            logger.exception("Falha ao montar a tabela FIPE offline; usando so a API")
+            return None
+        st.session_state[key] = table
+    return table
