@@ -51,6 +51,7 @@ from grand_brasil.analysis._comparable_selection import (
     weighted_median,
     year_adjusted_prices,
 )  # `year_adjusted_prices` is reused by _resolve_target_margins
+from grand_brasil.analysis.market_anchor import compute_market_anchor
 from grand_brasil.analysis._fipe_spread import (
     compute_fipe_spreads,
     fipe_ratio,
@@ -178,7 +179,7 @@ def appraise(
         and comparables_df["sale_date"].notna().any()
     )
     suggestion.used_weighted_median = has_sale_date and not fipe_mode
-    reference_date = pd.Timestamp.now()
+    reference_date = reference_date if reference_date is not None else pd.Timestamp.now()
 
     # ── 5) KM factor per channel (brand-specific) ──
     loja_km_pct, revenda_km_pct = _apply_km_factors(
@@ -236,6 +237,18 @@ def appraise(
         recency_halflife_days=recency_halflife_days,
         loja_target_margin=effective_loja_margin,
         revenda_target_margin=effective_revenda_margin,
+        margin_basis=margin_basis,
+        tax_pct=tax_pct,
+    )
+
+    # ── 8b) Market anchor M: sale/FIPE of our sales (replaces the spread anchor in the ensemble) ──
+    _apply_market_anchor(
+        suggestion=suggestion,
+        request=request,
+        sales_df=sales_df,
+        reference_date=reference_date,
+        loja_target_margin=effective_loja_margin,
+        appraisal_config=appraisal_config,
         margin_basis=margin_basis,
         tax_pct=tax_pct,
     )
@@ -468,6 +481,12 @@ def _apply_recommendation(suggestion: AppraisalSuggestion, appraisal_config) -> 
     mode = getattr(appraisal_config, "headline_mode", "buy_ratio_first") if appraisal_config else "buy_ratio_first"
     a = suggestion.buy_ratio_price if suggestion.buy_ratio_available else None
     b = suggestion.blended_max_trade_value
+    partner = str(getattr(appraisal_config, "ensemble_partner", "sales")) if appraisal_config else "sales"
+    partner_label = "análise de vendas"
+    m = suggestion.market_max_trade_value if suggestion.market_available else None
+    if partner == "market" and m is not None and m > 0:
+        b = m
+        partner_label = "mercado (venda/FIPE)"
     has_a = a is not None and a > 0
     has_b = b is not None and b > 0
 
@@ -480,7 +499,7 @@ def _apply_recommendation(suggestion: AppraisalSuggestion, appraisal_config) -> 
         suggestion.recommended_source = "ensemble"
         brl = lambda v: f"{v:,.0f}".replace(",", ".")
         suggestion.recommended_reason = (
-            f"{w:.0%} histórico de compra ({brl(a)}) + {1 - w:.0%} análise de vendas ({brl(b)})."
+            f"{w:.0%} histórico de compra ({brl(a)}) + {1 - w:.0%} {partner_label} ({brl(b)})."
         )
         return
 
@@ -492,6 +511,49 @@ def _apply_recommendation(suggestion: AppraisalSuggestion, appraisal_config) -> 
         suggestion.recommended_value = b
         suggestion.recommended_source = "blend"
         suggestion.recommended_reason = suggestion.blended_reason or "Sem histórico de compra — análise de vendas."
+
+
+def _apply_market_anchor(
+    suggestion: AppraisalSuggestion,
+    request: AppraisalRequest,
+    sales_df: pd.DataFrame,
+    reference_date: pd.Timestamp,
+    loja_target_margin: float,
+    appraisal_config,
+    margin_basis: str,
+    tax_pct: float,
+) -> None:
+    """Anchor M (analysis/market_anchor): estimated showroom sale from our own sales'
+    sale/FIPE, then the same margin rule as the channel prices. Needs `sales_df`
+    enriched by `prepare_sales_ratios` and a FIPE price on the request."""
+    cfg = getattr(appraisal_config, "market_anchor", None) if appraisal_config else None
+    if cfg is None or not cfg.enabled or request.fipe_price is None or request.fipe_price <= 0:
+        return
+    try:
+        res = compute_market_anchor(
+            model_red=request.model_red, brand=request.brand, year_model=request.year_model, km=request.km,
+            fipe_price=request.fipe_price, sales_df=sales_df, reference_date=reference_date, cfg=cfg, channel=cfg.channel,
+        )
+    except Exception as e:  # never let the market anchor break the appraisal
+        logger.warning(f"market anchor failed: {e}")
+        return
+    if res is None:
+        return
+    suggestion.market_available = True
+    suggestion.market_ratio = round(res.ratio, 4)
+    suggestion.market_estimated_sale_price = _round_to_500(res.estimated_sale)
+    suggestion.market_max_trade_value = _calc_max_trade(
+        estimated_sale_price=res.estimated_sale,
+        target_margin_percent=loja_target_margin,
+        repair_cost=request.estimated_repair_cost,
+        basis=margin_basis,
+        tax_pct=tax_pct,
+    )
+    suggestion.market_sample_size = res.n
+    suggestion.market_effective_n = res.n_eff
+    suggestion.market_tier = res.tier
+    suggestion.market_km_slope = round(res.km_slope, 4)
+    suggestion.market_age_slope = round(res.age_slope, 4)
 
 
 def _apply_fipe_ratio_alert(suggestion: AppraisalSuggestion, request: AppraisalRequest, appraisal_config) -> None:

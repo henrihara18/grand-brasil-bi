@@ -396,6 +396,8 @@ def _run_appraisal(
         purpose=purpose,
     )
 
+    sales_df = _sales_with_market_ratios(sales_df, appraisal_df, appraisal_cfg)
+
     with st.spinner("Calculando avaliacao (buscando FIPE historica)..."):
         result = appraise(
             request=request,
@@ -429,3 +431,32 @@ def _run_appraisal(
         "year_model": year_model_int,
         "km": km,
     }
+
+
+def _sales_with_market_ratios(sales_df, appraisal_df, appraisal_cfg):
+    """Enrich the sales frame once per session with sale/FIPE of the sale month (anchor M).
+
+    The FIPE of past months comes from an offline table built from the appraisal base,
+    so the dashboard never calls the FIPE API thousands of times; the ERP's FIPE column
+    on the sale is the fallback. Cached in session state keyed by the frame size.
+    """
+    cfg = getattr(appraisal_cfg, "market_anchor", None)
+    if sales_df is None or cfg is None or not cfg.enabled or appraisal_df is None:
+        return sales_df
+    key = f"sales_market_ratios_{len(sales_df)}_{len(appraisal_df)}"
+    cached = st.session_state.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from grand_brasil.analysis.market_anchor import prepare_sales_ratios
+        from grand_brasil.backtest.fipe_table import FipeTable
+        with st.spinner("Lendo venda/FIPE das vendas (ancora de mercado)..."):
+            enriched = prepare_sales_ratios(
+                sales_df, FipeTable(appraisal_df), erp_fipe_fallback=cfg.erp_fipe_fallback,
+                ratio_min=cfg.ratio_min, ratio_max=cfg.ratio_max,
+            )
+    except Exception:
+        logger.exception("Falha ao preparar a ancora de mercado; seguindo sem ela")
+        return sales_df
+    st.session_state[key] = enriched
+    return enriched

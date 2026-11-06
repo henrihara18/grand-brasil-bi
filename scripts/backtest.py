@@ -123,6 +123,11 @@ def main() -> None:
     print("margem-alvo Loja por faixa (realizada antes do teste):", {k: f"{v:.1%}" for k, v in targets.loja_by_band.items()}, "| Revenda:", f"{targets.revenda:.0%}")
 
     fipe = TableFipeClient(FipeTable(appr))
+    if cfg.market_anchor.enabled:
+        from grand_brasil.analysis.market_anchor import prepare_sales_ratios
+        sales = prepare_sales_ratios(sales, fipe.table, erp_fipe_fallback=cfg.market_anchor.erp_fipe_fallback,
+                                     ratio_min=cfg.market_anchor.ratio_min, ratio_max=cfg.market_anchor.ratio_max)
+        print(f"  ancora de mercado: {int(sales['ratio_fipe'].notna().sum())} vendas com venda/FIPE do mes da venda | parceiro do ensemble: {cfg.ensemble_partner}")
     print(f"tabela FIPE: {fipe.table.size} combinacoes modelo x ano x mes")
 
     conf_model = None

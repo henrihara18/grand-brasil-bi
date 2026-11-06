@@ -69,6 +69,7 @@ def all_breakdowns(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "confianca atual": breakdown(df, "confidence"),
         "modo de preco (portao)": breakdown(df, "price_mode") if "price_mode" in df.columns else breakdown(df, "confidence"),
         "tier do buy-ratio": breakdown(df, "buy_ratio_tier"),
+        "tier da ancora de mercado": breakdown(df, "market_tier") if "market_tier" in df.columns else breakdown(df, "buy_ratio_tier"),
         "marca": breakdown(df, "sale_brand", min_n=30),
         "modelo (top 25)": breakdown(df, "sale_model_red", min_n=25, top=25),
         "faixa de ano": breakdown(df, "year_band"),

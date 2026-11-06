@@ -717,6 +717,52 @@ válidas, **18,5 % a ≤ 2,5 % da mesa** (set 16,6 %, out 20,2 %; compradas 20,5
 compradas está acima em 82 %; nas compradas a mesa pagou acima da própria oferta em 32 %. Ou seja,
 a oferta da mesa é um número de abertura; o algoritmo é calibrado no que de fato se pagou.
 
+### 4.10 Âncora de mercado M: venda ÷ FIPE das nossas vendas (06/11/2026)
+
+Direção do Henri: a oferta deve se basear na **venda**, não em assumir que a mesa pagou certo, e a
+âncora deve ler "como o modelo está sendo negociado" (venda/FIPE), respeitando que a venda acontece
+meses depois da compra (FIPE da época da venda). Implementada em `analysis/market_anchor.py`:
+
+- `ratio_i = venda_i / FIPE_i(mês da venda)` por venda de **loja**; FIPE do mês vem da tabela
+  offline montada das avaliações (`backtest/fipe_table.FipeTable`), com a coluna FIPE do ERP como
+  fallback (cobertura 76 % → 81 % das vendas). Razões fora de [0,4; 1,4] descartadas.
+- Comparáveis do mesmo modelo até ±3 anos, pesados por `exp(-|Δano|/1) · exp(-|Δkm|/20 mil) ·
+  recência (meia-vida 365 d)`; cada comparável é trazido para o KM e a idade pedidos com
+  inclinações ajustadas nas próprias vendas (dentro de grupos modelo×ano). Mediana ponderada.
+  Sem 3 vendas do modelo (ou n efetivo < 1,5): fallback marca × idade (≥ 5 vendas). Senão, nada.
+- `venda estimada = FIPE hoje × ratio`; valor de compra pela mesma regra de margem dos canais.
+- No ensemble, M entra no lugar da B legada (`ensemble_partner: market`; `sales` volta à B).
+  A tela mostra o bloco "Mercado — venda ÷ FIPE".
+
+**Medição (régua limpa, walk-forward):**
+
+| | A (compras) | B legada | **M** | ensemble A+B (`semred1`) | **ensemble A+M (`market1`)** |
+|---|---|---|---|---|---|
+| MAPE vs ideal | 6,3 % | 8,1 % | 6,3 % | 6,2 % | 6,2 % |
+| viés | −0,5 | −1,3 | +0,7 | −0,5 | +0,5 |
+| Loja: MAPE / ±5 % | | | | 5,5 % / 60 % | 5,4 % / 63 % |
+| portão: MAPE / ±10 % | | | | 4,4 % / 91 % | 4,4 % / 91 % |
+| a 2,5 % do pago (mesmos casos) | 39 % | 25 % | 32 % | 41 % | 41 % |
+
+Variantes testadas para M (protótipo, 1.465 casos com M e A): tiers duros ano/KM (7,6 %), meia-vida
+365 (7,3 %), ajuste de KM em todo tier (neutro), mínimo de 2 comparáveis (pior, 8,6 %), **pesos por
+similaridade + inclinações (6,3–6,5 %, adotado)**. Fallback por modelo sem limite de ano (12 %) foi
+descartado em favor de marca × idade (6,2–6,4 %). M acerta mais que o ensemble antigo em carros com
+mais de 10 anos (viés −1,8 % vs −5,2 %) e abaixo de 60 mil (−1,8 % vs −4,5 %); perde na Revenda.
+20 % dos casos não têm venda comparável (nem do modelo nem marca×idade): é onde entrariam anúncios
+externos (Webmotors), item do backlog.
+
+**Contra a oferta da mesa** (set–out, 3.048 avaliações válidas, motor com a base de hoje): A+M acerta
+a 2,5 % em **14,4 %** (A+B: 18,5 %), mediana +7,7 % acima da oferta (A+B: +6,6 %). A âncora de venda
+confirma que a oferta da mesa fica abaixo do que a venda sustenta e, por construção, afasta o
+algoritmo dela. **Decisão de negócio pendente**: o objetivo mestre do backlog (60 % a 2,5 % da mesa)
+e "basear na venda" puxam em direções opostas; o modelo de dois preços (abertura × máximo) é a saída
+proposta. Por que M mesmo empatando: ela lê só vendas, então não aprende com as sugestões do
+próprio motor quando ele estiver no ar (fase B do backlog), e é a base natural da tabela mestra.
+
+Bug lateral corrigido: `appraise()` sobrescrevia `reference_date` com "agora" mesmo quando o backtest
+passava o corte do mês (inócuo para medianas ponderadas, mas errado).
+
 ---
 
 ## Fase 5 — Entrega
@@ -736,9 +782,10 @@ a oferta da mesa é um número de abertura; o algoritmo é calibrado no que de f
 | alerta | `analysis/appraisal.py` (`_apply_fipe_ratio_alert`), `result.py` | aviso quando o valor recomendado passa de 95 % da FIPE (`fipe_ratio_alert`) |
 | portão | `analysis/appraisal.py` (`_apply_official_gate`), `config.OfficialGateConfig`, `result.py`, `backtest/runner.py` | preço oficial × sugestão por confiança calibrada + idade/KM/0 km/marca/modelo (4.8) |
 | blindado | `ingestion/appraisal_history.py`, `pages/_avaliacao/loaders.py` | flag lida também da observação (`blindado_from_notes`); loaders da tela seguem o config (acabamento, blindado) |
+| mercado | `analysis/market_anchor.py`, `config.MarketAnchorConfig`, `appraisal.py::_apply_market_anchor`, `result.py`, `backtest/runner.py` | âncora M venda/FIPE no lugar da B no ensemble (`ensemble_partner`), 4.10 |
 | config | `config.yaml` | pilha final ligada, com os valores antigos anotados para reproduzir a régua |
 
-Testes: **467** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
+Testes: **483** (eram 349 no início da revisão); novos para tiers, recência, ajuste de KM,
 shrinkage, perfil por marca, ensemble, toggles da âncora B, confiança, integração, backtest,
 higiene da base, acabamentos, alerta de FIPE, portão de preço oficial e blindado pela observação.
 

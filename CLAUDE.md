@@ -92,22 +92,26 @@ The `appraise()` function produces TWO independent anchors:
      when closed deals are insufficient).
    - Output: `buy_ratio_price` and P25/P75 confidence band.
 
-2. **Secondary — sales-based** (margin + KM + blindado + FIPE spread)
-   - FIPE price × historical spread_vs_FIPE → estimated sale price per channel
-   - Target margin (Loja 15%, Revenda 5.5%) → max trade value
-   - Brand-specific KM factor adjustment (`utils/fator_km_preco.py`)
-   - Blindado premium added to both channels when applicable
-   - Displayed as "Validação cruzada"; divergence > 8% triggers a warning.
+2. **Market anchor M** (`analysis/market_anchor.py`, REVISAO 4.10) — sale/FIPE of our own
+   showroom sales, FIPE of the sale month (offline `FipeTable` from the appraisal base, ERP FIPE
+   column as fallback), comparables of the model within ±3 years weighted by |Δyear|, |Δkm| and
+   recency, moved to the requested KM/age with slopes fitted on the sales; fallback brand × age.
+   Reads only sales, so it does not learn from the engine's own suggestions. The sales frame must
+   be enriched with `prepare_sales_ratios` (dashboard: `_sales_with_market_ratios`; backtest script).
 
-3. **Headline** (`headline_mode` in config.yaml): `ensemble` = 70% anchor A + 30% anchor B
-   (`recommended_value`); `buy_ratio_first` = legacy (A when available, else channel blend).
+3. **Legacy sales-based anchor B** (margin + KM + blindado + FIPE spread): FIPE × historical
+   spread → sale per channel → target margin → trade value; brand KM factor; blindado premium.
+   Still computed and shown as "Validação cruzada"; divergence > 8% triggers a warning.
 
-4. **Calibrated confidence** (`analysis/confidence.py`): empirical error quantiles of past
+4. **Headline** (`headline_mode` in config.yaml): `ensemble` = 70% anchor A + 30% partner, where
+   `ensemble_partner` = `market` (M, default) or `sales` (B); `buy_ratio_first` = legacy.
+
+5. **Calibrated confidence** (`analysis/confidence.py`): empirical error quantiles of past
    appraisals with the same profile (buy-ratio tier × anchor divergence × band width × closed
    deals), from `data/confidence_calibration.json`. Levels: alta (q90 ≤ 10%), média (≤ 15%),
    baixa. Falls back to the comparable count when the file is missing.
 
-5. **Official-price gate** (`config.yaml → appraisal.official_gate`, `_apply_official_gate`):
+6. **Official-price gate** (`config.yaml → appraisal.official_gate`, `_apply_official_gate`):
    `price_mode` = `oficial` only when the calibrated confidence is alta/média and the car is
    within age/KM limits, not 0 km / next model year, not an excluded brand/model, not blindado.
    Otherwise the headline is shown as a suggestion with the reasons (`price_mode_reasons`).

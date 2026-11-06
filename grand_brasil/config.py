@@ -90,6 +90,28 @@ class FipeSpreadConfig(BaseModel):
     loja_fallback_ratio: Optional[float] = None      # default: no fallback → raw FIPE
 
 
+class MarketAnchorConfig(BaseModel):
+    """Anchor M: sale/FIPE of our own sales (FIPE of the sale month), similarity-weighted.
+
+    Measured on the 2026 ruler (REVISAO 4.10): alone it ties anchor A (MAPE 6.3 %) and
+    beats the legacy spread anchor B (8.1 %); mixed 0.3 M + 0.7 A it matches the legacy
+    ensemble (5.2 % vs 5.3 %) while reading only sales, so it does not learn from the
+    engine's own suggestions once in production.
+    """
+    enabled: bool = True
+    halflife_days: float = 365.0            # recency half-life of a sale
+    year_window: int = 3                    # comparables within +/- years of the request
+    year_scale: float = 1.0                 # similarity weight exp(-|dy| / year_scale)
+    km_scale: float = 20000.0               # similarity weight exp(-|dkm| / km_scale)
+    min_comparables: int = 3                # sales of the model needed for the kernel tier
+    min_effective_comparables: float = 1.5  # sum(w)/max(w) below this -> brand x age fallback
+    fallback_min_comparables: int = 5       # brand x age sales needed for the fallback tier
+    ratio_min: float = 0.4                  # plausible sale/FIPE band
+    ratio_max: float = 1.4
+    erp_fipe_fallback: bool = True          # use the ERP's FIPE column when the table has no value
+    channel: str = "Loja"                   # sales used to read the market (showroom)
+
+
 class PriceBandMargin(BaseModel):
     """Base target margin (%) for a single price band."""
 
@@ -251,6 +273,7 @@ class AppraisalConfig(BaseModel):
     headline_mode: str = "buy_ratio_first"
     ensemble_weight_buy_ratio: float = 0.7
     ensemble_weight_by_tier: dict[str, float] = {}   # optional per-tier override of the weight
+    ensemble_partner: str = "market"              # second anchor in the ensemble: "market" (M, sale/FIPE) | "sales" (legacy B blend)
     # Alert when the headline sits above this share of FIPE (None = off). In 2026, a third of
     # the 78 closed deals above 95 % of FIPE (0 km / next model year, trade-in on a new-car
     # sale) ended with a negative margin.
@@ -273,6 +296,7 @@ class AppraisalConfig(BaseModel):
     blindado: BlindadoConfig = BlindadoConfig()
     dynamic_margin: DynamicMarginConfig = DynamicMarginConfig()
     fipe_spread: FipeSpreadConfig = FipeSpreadConfig()
+    market_anchor: MarketAnchorConfig = MarketAnchorConfig()
     km_curve: KMCurveConfig = KMCurveConfig()
     brand_tier: BrandTierConfig = BrandTierConfig()
     channel_probability: ChannelProbabilityConfig = ChannelProbabilityConfig()

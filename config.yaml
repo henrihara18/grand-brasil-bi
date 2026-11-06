@@ -97,6 +97,9 @@ appraisal:
   # ±10% 76% -> 80%. "buy_ratio_first" reproduz o comportamento antigo.
   headline_mode: ensemble
   ensemble_weight_buy_ratio: 0.7
+  # Segunda ancora do ensemble: market = venda/FIPE das nossas vendas (ancora M, 4.10);
+  # sales = spread FIPE legado (ancora B). M le so vendas, entao nao aprende com a propria sugestao.
+  ensemble_partner: market
   # Alerta na tela quando o valor recomendado passa desta fracao da FIPE: dos 78 fechamentos
   # de 2026 acima de 95% da FIPE (0 km / ano seguinte, troca na venda de novo) um terco saiu
   # com margem negativa. null desliga.
@@ -120,6 +123,22 @@ appraisal:
   reconcile_paid_with_sales: true
   reconcile_tolerance: 0.05
   ratio_floor_by_age: {0: 0.70, 1: 0.65, 3: 0.65, 6: 0.58, 10: 0.50, 99: 0.40}
+
+  # ── Ancora de mercado (M): venda / FIPE do mes da venda, pesos por ano, KM e recencia ──
+  # Regua 2026 (4.10): sozinha MAPE 6,3% (B legado 8,1%); 0,3 M + 0,7 A = 5,2%.
+  market_anchor:
+    enabled: true
+    halflife_days: 365
+    year_window: 3
+    year_scale: 1.0
+    km_scale: 20000
+    min_comparables: 3
+    min_effective_comparables: 1.5
+    fallback_min_comparables: 5
+    ratio_min: 0.4
+    ratio_max: 1.4
+    erp_fipe_fallback: true
+    channel: Loja
 
   # ── Fallback de spread FIPE quando nao ha historico suficiente ────────────
   # Sem historico, o spread calculado seria ruidoso. A regra de fallback

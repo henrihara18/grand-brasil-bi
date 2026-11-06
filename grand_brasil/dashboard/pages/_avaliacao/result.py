@@ -42,6 +42,7 @@ def render_result(result) -> None:
         st.warning(result.rationale)
         return
 
+    _render_market_anchor(result)
     _render_secondary_cards(result)
     _render_modifiers(result)
 
@@ -366,6 +367,27 @@ def _render_confidence_badge(result) -> None:
     st.markdown(
         f"**Confianca:** :{color}[{result.confidence.upper()}] "
         f"({result.total_comparables} vendas comparaveis{outlier_text})"
+    )
+
+
+def _render_market_anchor(result) -> None:
+    """Anchor M: what the market pays for this car, read from our own sales (sale/FIPE)."""
+    if not getattr(result, "market_available", False):
+        return
+    st.divider()
+    st.markdown("### 📈 Mercado — venda ÷ FIPE das nossas vendas")
+    tier = "mesmo modelo" if result.market_tier == "kernel" else "mesma marca e idade (sem venda do modelo)"
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Valor de compra — mercado", format_brl(result.market_max_trade_value))
+    with c2:
+        st.metric("Venda estimada", format_brl(result.market_estimated_sale_price))
+    with c3:
+        st.metric("Venda / FIPE", f"{result.market_ratio * 100:.1f}%")
+    st.caption(
+        f"{result.market_sample_size} vendas de loja ({tier}), pesadas por ano, KM e recência; "
+        f"FIPE do mês de cada venda. Ajuste de KM: {result.market_km_slope * 100:+.1f} pontos por 10 mil km. "
+        "Esta âncora lê só vendas, por isso não aprende com as próprias sugestões do algoritmo."
     )
 
 

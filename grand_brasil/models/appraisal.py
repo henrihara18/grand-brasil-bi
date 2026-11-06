@@ -156,6 +156,17 @@ class AppraisalSuggestion(BaseModel):
     buy_ratio_low: Optional[Decimal] = None      # FIPE × P25
     buy_ratio_high: Optional[Decimal] = None     # FIPE × P75
 
+    # Anchor M: market (our sales, sale/FIPE of the sale month, similarity-weighted)
+    market_available: bool = False
+    market_ratio: Optional[float] = None               # est_sale / FIPE today
+    market_estimated_sale_price: Optional[Decimal] = None
+    market_max_trade_value: Optional[Decimal] = None   # after margin (and taxes when basis=sale)
+    market_sample_size: int = 0
+    market_effective_n: Optional[float] = None
+    market_tier: Optional[str] = None                  # "kernel" | "brand_age"
+    market_km_slope: Optional[float] = None
+    market_age_slope: Optional[float] = None
+
     # Divergence diagnostic: how far apart the two anchors sit
     anchor_divergence_pct: Optional[float] = None  # (buy_ratio - sales_based) / sales_based
 
