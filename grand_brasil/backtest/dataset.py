@@ -103,6 +103,28 @@ def link_cases(
     return linked.reset_index(drop=True)
 
 
+def flag_below_mesa(cases: pd.DataFrame, threshold: float = 0.02) -> pd.DataFrame:
+    """Mark cars that entered stock clearly below the desk's own value ("Valor Mesa").
+
+    When the final value is more than `threshold` below the desk value, the desk saw
+    something the inputs do not carry (a bad inspection report, damage, pending debts):
+    those cars are not a fair test of the engine and are excluded from the efficiency
+    figures by default. A ratio outside [0.5, 2] is a data-entry scale error
+    (105.000 typed as 10.500) and is flagged separately, never as a reduction.
+    Adds `valor_mesa`, `final_vs_mesa_pct`, `below_mesa`, `mesa_data_error`.
+    """
+    df = cases.copy()
+    mesa = pd.to_numeric(df["Valor Mesa"], errors="coerce") if "Valor Mesa" in df.columns else pd.Series(np.nan, index=df.index)
+    final = pd.to_numeric(df["appraised_value"], errors="coerce")
+    ratio = final / mesa.where(mesa > 0)
+    df["valor_mesa"] = mesa
+    df["final_vs_mesa_pct"] = (ratio - 1.0)
+    df["mesa_data_error"] = ratio.notna() & ((ratio < 0.5) | (ratio > 2.0))
+    df["below_mesa"] = ratio.notna() & ~df["mesa_data_error"] & (ratio < 1.0 - threshold)
+    logger.info(f"Below-desk-value cases: {int(df['below_mesa'].sum())} of {len(df)} (scale errors: {int(df['mesa_data_error'].sum())})")
+    return df
+
+
 def add_targets(cases: pd.DataFrame, targets: MarginTargets) -> pd.DataFrame:
     df = cases.copy()
     df["price_band"] = price_band(df["sale_price"])

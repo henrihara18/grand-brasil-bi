@@ -83,3 +83,25 @@ class TestTargets:
         assert out.loc[0, "custo_ideal"] == pytest.approx(88_000)   # 100k - 2k - 10%
         assert out.loc[1, "custo_ideal"] == pytest.approx(98_000)   # 100k - 2k - 0%
         assert out.loc[1, "paid_vs_ideal_pct"] == pytest.approx(1_000 / 98_000)
+
+
+# ---- cars that entered below the desk's own value are not a fair test of the engine ----
+from grand_brasil.backtest.dataset import flag_below_mesa
+
+
+def test_flag_below_mesa_marks_reductions_and_scale_errors():
+    import pandas as pd
+    cases = pd.DataFrame({
+        "appraised_value": [45000.0, 50000.0, 49500.0, 105000.0, 60000.0],
+        "Valor Mesa": [50000.0, 50000.0, 50000.0, 10500.0, None],
+    })
+    out = flag_below_mesa(cases, threshold=0.02)
+    assert list(out["below_mesa"]) == [True, False, False, False, False]      # -10% yes; equal no; -1% under threshold; typo no; missing no
+    assert list(out["mesa_data_error"]) == [False, False, False, True, False]
+    assert round(float(out.loc[0, "final_vs_mesa_pct"]), 3) == -0.1
+
+
+def test_flag_below_mesa_without_column_flags_nothing():
+    import pandas as pd
+    out = flag_below_mesa(pd.DataFrame({"appraised_value": [1.0, 2.0]}))
+    assert not out["below_mesa"].any() and not out["mesa_data_error"].any()

@@ -21,7 +21,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from grand_brasil.backtest.dataset import add_targets, link_cases, loja_margin_targets  # noqa: E402
+from grand_brasil.backtest.dataset import flag_below_mesa, add_targets, link_cases, loja_margin_targets  # noqa: E402
 from grand_brasil.backtest.fipe_table import FipeTable, TableFipeClient  # noqa: E402
 from grand_brasil.backtest.metrics import add_errors, all_breakdowns, fmt_summary, summarize, table_md  # noqa: E402
 from grand_brasil.backtest.runner import RunOptions, run_backtest  # noqa: E402
@@ -48,6 +48,9 @@ def main() -> None:
     ap.add_argument("--purpose", default="auto", choices=["auto", "loja", "revenda", "from_case"],
                     help="from_case = Revenda quando a avaliacao foi lancada como REPASSE (o que o avaliador escolheria na tela)")
     ap.add_argument("--keep-same-plate", action="store_true", help="nao excluir avaliacoes anteriores do mesmo carro")
+    ap.add_argument("--keep-below-mesa", action="store_true",
+                    help="manter na regua os carros que entraram abaixo do Valor Mesa (laudo/avaria que o motor nao ve); por padrao sao excluidos")
+    ap.add_argument("--below-mesa-threshold", type=float, default=0.02, help="quanto abaixo do Valor Mesa conta como reducao (default 2%%)")
     ap.add_argument("--limit", type=int, default=None, help="rodar so os N primeiros casos (debug)")
     ap.add_argument("--no-confidence-calibration", action="store_true",
                     help="usar a confianca por contagem (sem data/confidence_calibration.json) — a calibrada e ajustada com os proprios casos de 2026")
@@ -109,6 +112,11 @@ def main() -> None:
     test_start, test_end = pd.Timestamp(args.test_start), pd.Timestamp(args.test_end)
     targets = loja_margin_targets(sales, until=pd.Timestamp(args.targets_until) if args.targets_until else test_start)
     cases = add_targets(link_cases(appr_cases, sales, test_start, test_end, args.max_lag_days), targets)
+    cases = flag_below_mesa(cases, args.below_mesa_threshold)
+    n_below, n_err = int(cases['below_mesa'].sum()), int(cases['mesa_data_error'].sum())
+    if not args.keep_below_mesa:
+        cases = cases[~cases['below_mesa'] & ~cases['mesa_data_error']].copy()
+    print(f"  entraram >{args.below_mesa_threshold:.0%} abaixo do Valor Mesa: {n_below} casos ({'mantidos' if args.keep_below_mesa else 'excluidos da regua'}) | erro de escala no Valor Mesa: {n_err} ({'mantidos' if args.keep_below_mesa else 'excluidos'})")
     if args.limit:
         cases = cases.head(args.limit)
     print(f"casos: {len(cases)} avaliacoes fechadas em [{test_start:%d/%m/%Y}, {test_end:%d/%m/%Y}) com venda posterior")

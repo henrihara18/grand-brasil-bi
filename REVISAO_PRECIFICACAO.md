@@ -690,6 +690,33 @@ in-sample neste ano (`--no-confidence-calibration` volta à contagem). Com ela, 
 cobertura é maior que os 44 % walk-forward porque a tabela cheia tem perfil para todos os meses.
 Em produção o número real fica entre os dois até a recalibração do mês seguinte.
 
+### 4.9 Régua sem os carros que entraram abaixo da mesa (06/11/2026)
+
+Pedido do Henri: carro que entrou claramente abaixo do **Valor Mesa** (laudo ruim, avaria, dívida)
+não é teste justo do motor — a mesa viu algo que os dados não carregam. `backtest/dataset.py::flag_below_mesa`
+marca `below_mesa` (final mais de 2 % abaixo do Valor Mesa) e `mesa_data_error` (razão fora de
+[0,5; 2], erro de digitação de escala); `scripts/backtest.py` exclui os dois por padrão
+(`--keep-below-mesa` mantém). Na régua de 2026: 258 reduções (12 %) e 17 erros de escala.
+
+| | com todos (`blind1`) | sem reduções (`semred1`) |
+|---|---|---|
+| casos | 2.138 | 1.863 |
+| MAPE geral | 6,4 % | 6,2 % |
+| dentro do portão (walk-forward) | 4,9 % · ±10 % 88 % | 4,7 % · ±10 % 89 % · erro > 15 % 2,9 % |
+| mesa vs ideal (geral / portão) | 5,0 % / 4,0 % | 4,8 % / 4,0 % |
+
+Nos carros excluídos o algoritmo ficava **+5,6 %** acima do pago em média (acima em 86 % deles) e
+59 % tinham custo de reparo lançado: é o padrão de laudo. **Modelos "precisos"** (MAE sem outliers
+≤ 3 % dentro do portão, n ≥ 8): 13 modelos, 225 casos, 18,6 % das avaliações desde abril, MAE 2,9 %,
+mediana 2,1 %, ±5 % 84 %. Com corte estrito de 2 %: 5 modelos, 58 casos.
+
+**Algoritmo × Valor Mesa em todas as avaliações válidas de set–out/2026** (compradas ou não, motor
+com a base de hoje e cortes semanais, sem duplicatas, sem erros de escala, sem reduções): 3.048
+válidas, **18,5 % a ≤ 2,5 % da mesa** (set 16,6 %, out 20,2 %; compradas 20,5 %; portão 21,5 %;
+13 precisos + portão 26,2 %). Mediana do algoritmo **+6,6 % acima** da oferta da mesa; nas não
+compradas está acima em 82 %; nas compradas a mesa pagou acima da própria oferta em 32 %. Ou seja,
+a oferta da mesa é um número de abertura; o algoritmo é calibrado no que de fato se pagou.
+
 ---
 
 ## Fase 5 — Entrega
